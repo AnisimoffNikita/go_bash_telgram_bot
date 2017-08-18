@@ -38,10 +38,10 @@ func readData(topic string, n int) ([]byte, error) {
 	log.Print(address)
 
 	res, err := http.Get(address)
-	defer res.Body.Close()
 	if err != nil {
 		return nil, err
 	}
+	defer res.Body.Close()
 
 	data, err := ioutil.ReadAll(res.Body)
 	if err != nil {

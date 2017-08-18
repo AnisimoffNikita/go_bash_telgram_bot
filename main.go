@@ -4,8 +4,7 @@ import (
 	"fmt"
 	"log"
 
-	"./bash"
-	//"github.com/AnisimoffNikita/go_bash_telgram_bot/tree/master/telegram"
+	"github.com/AnisimoffNikita/go_bash_telgram_bot/bash"
 )
 
 func main() {
