@@ -1,15 +1,21 @@
-package bot
+package main
 
 import (
 	"fmt"
+	"log"
 
-	"github.com/AnisimoffNikita/go_bash_telgram_bot/tree/master/bash"
+	"./bash"
 	//"github.com/AnisimoffNikita/go_bash_telgram_bot/tree/master/telegram"
 )
 
 func main() {
-	fmt.Println("Hello, world!")
 
-	bash.GetQuotes("abyss", 1)
+	quotes, err := bash.GetQuotes("abyss", 1)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println(quotes[0].Text)
 
 }

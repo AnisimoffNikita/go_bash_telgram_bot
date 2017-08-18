@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
 )
 
@@ -34,9 +35,10 @@ func GetQuotes(topic string, n int) ([]Quote, error) {
 func readData(topic string, n int) ([]byte, error) {
 	address := fmt.Sprintf("http://www.umori.li/api/get?site=bash.im&name=%s&num=%d", topic, n)
 
+	log.Print(address)
+
 	res, err := http.Get(address)
 	defer res.Body.Close()
-
 	if err != nil {
 		return nil, err
 	}
@@ -46,6 +48,7 @@ func readData(topic string, n int) ([]byte, error) {
 		return nil, err
 	}
 
-	return data, nil
+	fmt.Println(string(data))
 
+	return data, nil
 }
