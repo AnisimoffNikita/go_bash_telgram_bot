@@ -33,7 +33,7 @@ func GetQuotes(topic string, n int) ([]Quote, error) {
 }
 
 func readData(topic string, n int) ([]byte, error) {
-	address := fmt.Sprintf("http://www.umori.li/api/get?site=bash.im&name=%s&num=%d", topic, n)
+	address := fmt.Sprintf("http://umorili.herokuapp.com/api/get?site=bash.im&name=%s&num=%d", topic, n)
 
 	log.Print(address)
 
