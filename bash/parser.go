@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
+	"strings"
 )
 
 // Quote comment... wtf
@@ -29,13 +29,13 @@ func GetQuotes(topic string, n int) ([]Quote, error) {
 		return nil, err
 	}
 
+	processText(&quotes)
+
 	return quotes, nil
 }
 
 func readData(topic string, n int) ([]byte, error) {
 	address := fmt.Sprintf("http://umorili.herokuapp.com/api/get?site=bash.im&name=%s&num=%d", topic, n)
-
-	log.Print(address)
 
 	res, err := http.Get(address)
 	if err != nil {
@@ -51,4 +51,16 @@ func readData(topic string, n int) ([]byte, error) {
 	fmt.Println(string(data))
 
 	return data, nil
+}
+
+func processText(quotes *[]Quote) {
+	replacer := strings.NewReplacer("<p>", "",
+		"</p>", "",
+		"<br />", "",
+		"&nbsp;", " ",
+		"&raquo;", "»",
+		"&laquo;", "«")
+	for i := range *quotes {
+		(*quotes)[i].Text = replacer.Replace((*quotes)[i].Text)
+	}
 }
