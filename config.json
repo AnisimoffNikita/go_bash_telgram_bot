@@ -1,0 +1,9 @@
+{
+  "token" : "",
+  "cert" : "",
+  "pkey" : "",
+  "host" : "",
+  "port" : "",
+  "pool_size" : 10,
+  "timeout" : 1000
+}

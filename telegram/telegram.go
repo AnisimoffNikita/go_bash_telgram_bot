@@ -68,6 +68,7 @@ func StartBot(configPath string) error {
 		config.Cert,
 		config.Token,
 		config.PoolSize)
+
 	if err != nil {
 		log.Fatal(err)
 	}
