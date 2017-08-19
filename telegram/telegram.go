@@ -44,6 +44,7 @@ func newBot(token string, timeout time.Duration, poolSize int) (*Bot, error) {
 	}
 
 	bot.Debug = true
+	bot.Pool.Run()
 
 	self, err := bot.getMe()
 	if err != nil {
@@ -154,10 +155,6 @@ func (bot *Bot) makeRequest(method string, params url.Values) (APIResponse, erro
 }
 
 func (bot *Bot) uploadFile(method string, params map[string]string, param string, path string) (APIResponse, error) {
-
-	bot.log(method)
-	bot.log(param)
-	bot.log(path)
 
 	req, err := bot.uploadFileRequest(method, params, param, path)
 	if err != nil {
