@@ -24,6 +24,13 @@ type Bot struct {
 	Client  *http.Client
 	Pool    Pool
 	TimeOut time.Duration
+	Debug   bool
+}
+
+func (bot *Bot) log(l string) {
+	if bot.Debug {
+		log.Println(l)
+	}
 }
 
 func newBot(token string, timeout time.Duration, poolSize int) (*Bot, error) {
@@ -35,6 +42,8 @@ func newBot(token string, timeout time.Duration, poolSize int) (*Bot, error) {
 		},
 		TimeOut: timeout * time.Millisecond,
 	}
+
+	bot.Debug = true
 
 	self, err := bot.getMe()
 	if err != nil {
@@ -77,6 +86,8 @@ func StartBot(configPath string) error {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	bot.log("webhook done")
 
 	http.HandleFunc("/"+bot.Token, bot.updateHandler)
 	return http.ListenAndServeTLS("0.0.0.0:"+config.Port,
