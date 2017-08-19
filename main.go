@@ -15,6 +15,7 @@ func main() {
 		log.Fatal(err)
 	}
 
+
 	fmt.Println(quotes[0].Text)
 
 }
