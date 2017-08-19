@@ -15,6 +15,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"time"
+
+	"github.com/AnisimoffNikita/go_bash_telgram_bot/bash"
 )
 
 // Bot struct
@@ -98,8 +100,29 @@ func StartBot(configPath string) error {
 func (bot *Bot) updateHandler(w http.ResponseWriter, r *http.Request) {
 	_, err := bot.Pool.AddTaskSyncTimed(func() interface{} {
 		bytes, _ := ioutil.ReadAll(r.Body)
-		fmt.Println(string(bytes))
+
+		var update Update
+		if err := json.Unmarshal(bytes, &update); err != nil {
+			return nil
+		}
+
+		if update.Message == nil {
+			return nil
+		}
+
+		bot.log(fmt.Sprintf("[%s] %s", update.Message.From.UserName, update.Message.Text))
+
+		quotes, err := bash.GetQuotes("random", 1)
+		if err != nil {
+			return nil
+		}
+
+		for _, v := range quotes {
+			bot.sendText(update.Message.Chat.ID, v.Text)
+		}
+
 		return nil
+
 	}, bot.TimeOut)
 
 	if err != nil {
@@ -151,6 +174,19 @@ func (bot *Bot) makeRequest(method string, params url.Values) (APIResponse, erro
 	}
 
 	return apiResp, nil
+}
+
+// makeMessageRequest makes a request to a method that returns a Message.
+func (bot *Bot) makeMessageRequest(endpoint string, params url.Values) (Message, error) {
+	resp, err := bot.makeRequest(endpoint, params)
+	if err != nil {
+		return Message{}, err
+	}
+
+	var message Message
+	json.Unmarshal(resp.Result, &message)
+
+	return message, nil
 }
 
 func (bot *Bot) uploadFile(method string, params map[string]string, param string, path string) (APIResponse, error) {
@@ -233,4 +269,18 @@ func (bot *Bot) getMe() (User, error) {
 	}
 
 	return user, nil
+}
+
+func (bot *Bot) sendText(chatID int64, text string) (Message, error) {
+	params := url.Values{}
+	params.Add("chat_id", strconv.FormatInt(chatID, 10))
+	params.Add("text", text)
+
+	message, err := bot.makeMessageRequest("sendMessage", params)
+
+	if err != nil {
+		return Message{}, err
+	}
+
+	return message, nil
 }
