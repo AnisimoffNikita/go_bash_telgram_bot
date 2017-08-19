@@ -22,7 +22,7 @@ type Bot struct {
 	Token   string
 	Self    User
 	Client  *http.Client
-	Pool    Pool
+	Pool    *Pool
 	TimeOut time.Duration
 	Debug   bool
 }
@@ -35,11 +35,9 @@ func (bot *Bot) log(l string) {
 
 func newBot(token string, timeout time.Duration, poolSize int) (*Bot, error) {
 	bot := &Bot{
-		Token:  token,
-		Client: &http.Client{},
-		Pool: Pool{
-			concurrency: poolSize,
-		},
+		Token:   token,
+		Client:  &http.Client{},
+		Pool:    NewPool(poolSize),
 		TimeOut: timeout * time.Millisecond,
 	}
 
@@ -96,6 +94,7 @@ func StartBot(configPath string) error {
 		config.PKey,
 		nil)
 }
+
 func (bot *Bot) updateHandler(w http.ResponseWriter, r *http.Request) {
 	_, err := bot.Pool.AddTaskSyncTimed(func() interface{} {
 		bytes, _ := ioutil.ReadAll(r.Body)
@@ -104,7 +103,7 @@ func (bot *Bot) updateHandler(w http.ResponseWriter, r *http.Request) {
 	}, bot.TimeOut)
 
 	if err != nil {
-		http.Error(w, fmt.Sprintf("error: %s!\n", err), 500)
+		log.Println("updateError")
 	}
 }
 
