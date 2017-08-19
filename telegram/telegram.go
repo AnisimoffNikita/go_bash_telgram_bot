@@ -113,6 +113,7 @@ func (bot *Bot) setWebhook(webhookConfig WebhookConfig) (APIResponse, error) {
 	params["max_connections"] = strconv.Itoa(int(webhookConfig.PoolSize))
 
 	resp, err := bot.uploadFile("setWebhook", params, "certificate", webhookConfig.Cert)
+
 	if err != nil {
 		return APIResponse{}, err
 	}
@@ -153,6 +154,10 @@ func (bot *Bot) makeRequest(method string, params url.Values) (APIResponse, erro
 }
 
 func (bot *Bot) uploadFile(method string, params map[string]string, param string, path string) (APIResponse, error) {
+
+	bot.log(method)
+	bot.log(param)
+	bot.log(path)
 
 	req, err := bot.uploadFileRequest(method, params, param, path)
 	if err != nil {
