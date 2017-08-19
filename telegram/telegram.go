@@ -74,8 +74,8 @@ func StartBot(configPath string) error {
 
 	webhookConfig, err := NewWebhookConfig(config.Host,
 		config.Port,
-		config.Cert,
 		config.Token,
+		config.Cert,
 		config.PoolSize)
 
 	if err != nil {
