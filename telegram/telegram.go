@@ -63,22 +63,28 @@ func StartBot(configPath string) error {
 		log.Fatal(err)
 	}
 
+	log.Println("config found...")
+
 	var config Config
 	err = json.Unmarshal(bytes, &config)
 	if err != nil {
 		log.Fatal(err)
 	}
+	log.Println("config correct...")
 
 	bot, err := newBot(config.Token, config.TimeOut, config.PoolSize)
 	if err != nil {
 		log.Fatal(err)
 	}
 
+	log.Println("connected...")
+
 	if bot.Debug {
-		return bot.processUpdates()
+		log.Println("start (debug)...")
+		return bot.processUpdatesChannel()
 	}
 
-	webhookConfig, err := NewWebhookConfig(config.Host,
+	webhookConfig, err := newWebhookConfig(config.Host,
 		config.Port,
 		config.Token,
 		config.Cert,
@@ -87,10 +93,13 @@ func StartBot(configPath string) error {
 	if err != nil {
 		log.Fatal(err)
 	}
-	_, err = bot.setWebhook(webhookConfig)
+	_, err = bot.setWebhook(&webhookConfig)
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	log.Println("webhook set...")
+	log.Println("start...")
 
 	http.HandleFunc("/"+bot.Token, bot.updateHandler)
 	return http.ListenAndServeTLS("0.0.0.0:"+config.Port,
@@ -99,42 +108,28 @@ func StartBot(configPath string) error {
 		nil)
 }
 
-func (bot *Bot) processUpdates() error {
-	updates, err := bot.getUpdatesChan(bot.Pool.concurrency)
+func (bot *Bot) processUpdatesChannel() error {
+	updates, err := bot.getUpdatesChannel(bot.Pool.concurrency)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	for update := range updates {
 
 		_, err := bot.Pool.AddTaskSyncTimed(func() interface{} {
-			if update.Message == nil {
-				return nil
-			}
-
-			bot.log(fmt.Sprintf("[%s] %s", update.Message.From.UserName, update.Message.Text))
-
-			quotes, err := bash.GetQuotes("random")
-			if err != nil {
-				return nil
-			}
-
-			bot.sendText(update.Message.Chat.ID, quotes[0])
-
-			return nil
-
+			return bot.processUpdate(update)
 		}, bot.TimeOut)
 
 		if err != nil {
-			log.Println("updateError")
+			log.Println(err)
 		}
 
 	}
 	return nil
 }
 
-func (bot *Bot) getUpdatesChan(poolSize int) (<-chan Update, error) {
-	updatesChan := make(chan Update, poolSize)
+func (bot *Bot) getUpdatesChannel(poolSize int) (<-chan *Update, error) {
+	updatesChannel := make(chan *Update, poolSize)
 	offset := -1
 
 	go func() {
@@ -148,23 +143,25 @@ func (bot *Bot) getUpdatesChan(poolSize int) (<-chan Update, error) {
 
 			resp, err := bot.makeRequest("getUpdates", params)
 			if err != nil {
-				return
+				log.Println(err)
+				continue
 			}
-			var updates []Update
+			var updates []*Update
 
 			err = json.Unmarshal(resp.Result, &updates)
 			if err != nil {
-				return
+				log.Println(err)
+				continue
 			}
 
 			for _, v := range updates {
 				offset = v.UpdateID + 1
-				updatesChan <- v
+				updatesChannel <- v
 			}
 		}
 	}()
 
-	return updatesChan, nil
+	return updatesChannel, nil
 }
 
 func (bot *Bot) updateHandler(w http.ResponseWriter, r *http.Request) {
@@ -173,34 +170,35 @@ func (bot *Bot) updateHandler(w http.ResponseWriter, r *http.Request) {
 
 		var update Update
 		if err := json.Unmarshal(bytes, &update); err != nil {
-			return nil
+			return err
 		}
 
-		if update.Message == nil {
-			return nil
-		}
-
-		bot.log(fmt.Sprintf("[%s] %s", update.Message.From.UserName, update.Message.Text))
-
-		quotes, err := bash.GetQuotes("random")
-		if err != nil {
-			return nil
-		}
-
-		//for _, v := range quotes {
-		bot.sendText(update.Message.Chat.ID, quotes[0])
-		//}
-
-		return nil
+		return bot.processUpdate(&update)
 
 	}, bot.TimeOut)
 
 	if err != nil {
-		log.Println("updateError")
+		log.Println(err)
 	}
 }
 
-func (bot *Bot) setWebhook(webhookConfig WebhookConfig) (APIResponse, error) {
+func (bot *Bot) processUpdate(update *Update) error {
+	if update.Message == nil {
+		return ErrAPINoMessage
+	}
+
+	bot.log(fmt.Sprintf("[%s] %s", update.Message.From.UserName, update.Message.Text))
+
+	quotes, err := bash.GetQuotes(update.Message.Text)
+	if err != nil {
+		return err
+	}
+
+	_, err = bot.sendText(update.Message.Chat.ID, quotes[0])
+	return err
+}
+
+func (bot *Bot) setWebhook(webhookConfig *WebhookConfig) (APIResponse, error) {
 	params := make(map[string]string)
 	params["url"] = webhookConfig.URL.String()
 	params["max_connections"] = strconv.Itoa(int(webhookConfig.PoolSize))
@@ -215,7 +213,7 @@ func (bot *Bot) setWebhook(webhookConfig WebhookConfig) (APIResponse, error) {
 }
 
 func (bot *Bot) makeRequest(method string, params url.Values) (APIResponse, error) {
-	endpoint := fmt.Sprintf(APIEndpoint, bot.Token, method)
+	endpoint := fmt.Sprintf(TelegramEndpoint, bot.Token, method)
 
 	resp, err := bot.Client.PostForm(endpoint, params)
 	if err != nil {
@@ -315,7 +313,7 @@ func (bot *Bot) uploadFileRequest(method string, params map[string]string, param
 		return nil, err
 	}
 
-	endpoint := fmt.Sprintf(APIEndpoint, bot.Token, method)
+	endpoint := fmt.Sprintf(TelegramEndpoint, bot.Token, method)
 
 	req, err := http.NewRequest("POST", endpoint, body)
 	if err != nil {

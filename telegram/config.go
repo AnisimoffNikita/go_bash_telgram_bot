@@ -1,7 +1,6 @@
 package telegram
 
 import (
-	"encoding/json"
 	"errors"
 	"net/url"
 	"time"
@@ -9,11 +8,12 @@ import (
 
 // API endpoint mask
 const (
-	APIEndpoint = "https://api.telegram.org/bot%s/%s"
+	TelegramEndpoint = "https://api.telegram.org/bot%s/%s"
 )
 
 // Errors
 var (
+	ErrAPINoMessage = errors.New("not ok")
 	ErrAPINotOk     = errors.New("not ok")
 	ErrAPIForbidden = errors.New("forbidden")
 	ErrJobTimedOut  = errors.New("job request timed out")
@@ -38,7 +38,7 @@ type WebhookConfig struct {
 }
 
 // NewWebhookConfig is WebhookConfig c-tor
-func NewWebhookConfig(host, port, token, cert string, poolSize int) (WebhookConfig, error) {
+func newWebhookConfig(host, port, token, cert string, poolSize int) (WebhookConfig, error) {
 	url, err := url.Parse(host + ":" + port + "/" + token)
 	if err != nil {
 		return WebhookConfig{}, err
@@ -62,53 +62,4 @@ func NewMessageConfig(chatID int64, text string) MessageConfig {
 		chatID: chatID,
 		text:   text,
 	}
-}
-
-// User type telegram
-type User struct {
-	ID           int    `json:"id"`
-	FirstName    string `json:"first_name"`
-	LastName     string `json:"last_name"`
-	UserName     string `json:"username"`
-	LanguageCode string `json:"language_code"`
-}
-
-// APIResponse type telegram
-type APIResponse struct {
-	Ok          bool                `json:"ok"`
-	Result      json.RawMessage     `json:"result"`
-	ErrorCode   int                 `json:"error_code"`
-	Description string              `json:"description"`
-	Parameters  *ResponseParameters `json:"parameters"`
-}
-
-// ResponseParameters type telegram
-type ResponseParameters struct {
-	MigrateToChatID int64 `json:"migrate_to_chat_id"`
-	RetryAfter      int   `json:"retry_after"`
-}
-
-// Update type telegram
-type Update struct {
-	UpdateID int      `json:"update_id"`
-	Message  *Message `json:"message"`
-}
-
-// Chat type telegram
-type Chat struct {
-	ID        int64  `json:"id"`
-	Type      string `json:"type"`
-	Title     string `json:"title"`
-	UserName  string `json:"username"`
-	FirstName string `json:"first_name"`
-	LastName  string `json:"last_name"`
-}
-
-// Message type telegram
-type Message struct {
-	MessageID int    `json:"message_id"`
-	From      *User  `json:"from"`
-	Date      int    `json:"date"`
-	Chat      *Chat  `json:"chat"`
-	Text      string `json:"text"` // optional
 }

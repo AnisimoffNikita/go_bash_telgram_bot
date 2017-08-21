@@ -10,18 +10,14 @@ import (
 	"golang.org/x/net/html/charset"
 )
 
-// Quote comment... wtf
-type Quote struct {
-	Site string `json:"site"`
-	Name string `json:"name"`
-	Desc string `json:"desc"`
-	Link string `json:"link"`
-	Text string `json:"elementPureHtml"`
-}
+// BashEndpoint
+const (
+	BashEndpoint = "http://bash.im/%s"
+)
 
 // GetQuotes comment... wtf
 func GetQuotes(topic string) ([]string, error) {
-	address := fmt.Sprintf("http://bash.im/%s", topic)
+	address := fmt.Sprintf(BashEndpoint, topic)
 
 	res, err := http.Get(address)
 	if err != nil {
