@@ -3,7 +3,7 @@ package main
 import (
 	"log"
 
-	"github.com/AnisimoffNikita/go_bash_telgram_bot/telegram"
+	"./telegram"
 )
 
 func main() {

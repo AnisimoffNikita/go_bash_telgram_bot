@@ -14,6 +14,7 @@ const (
 
 // Errors
 var (
+	ErrAPINotOk     = errors.New("not ok")
 	ErrAPIForbidden = errors.New("forbidden")
 	ErrJobTimedOut  = errors.New("job request timed out")
 )

@@ -16,7 +16,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/AnisimoffNikita/go_bash_telgram_bot/bash"
+	"../bash"
 )
 
 // Bot struct
@@ -44,6 +44,7 @@ func newBot(token string, timeout time.Duration, poolSize int) (*Bot, error) {
 	}
 
 	bot.Debug = true
+
 	bot.Pool.Run()
 
 	self, err := bot.getMe()
@@ -73,6 +74,10 @@ func StartBot(configPath string) error {
 		log.Fatal(err)
 	}
 
+	if bot.Debug {
+		return bot.processUpdates()
+	}
+
 	webhookConfig, err := NewWebhookConfig(config.Host,
 		config.Port,
 		config.Token,
@@ -82,19 +87,84 @@ func StartBot(configPath string) error {
 	if err != nil {
 		log.Fatal(err)
 	}
-
 	_, err = bot.setWebhook(webhookConfig)
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	bot.log("webhook done")
 
 	http.HandleFunc("/"+bot.Token, bot.updateHandler)
 	return http.ListenAndServeTLS("0.0.0.0:"+config.Port,
 		config.Cert,
 		config.PKey,
 		nil)
+}
+
+func (bot *Bot) processUpdates() error {
+	updates, err := bot.getUpdatesChan(bot.Pool.concurrency)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for update := range updates {
+
+		_, err := bot.Pool.AddTaskSyncTimed(func() interface{} {
+			if update.Message == nil {
+				return nil
+			}
+
+			bot.log(fmt.Sprintf("[%s] %s", update.Message.From.UserName, update.Message.Text))
+
+			quotes, err := bash.GetQuotes("random")
+			if err != nil {
+				return nil
+			}
+
+			bot.sendText(update.Message.Chat.ID, quotes[0])
+
+			return nil
+
+		}, bot.TimeOut)
+
+		if err != nil {
+			log.Println("updateError")
+		}
+
+	}
+	return nil
+}
+
+func (bot *Bot) getUpdatesChan(poolSize int) (<-chan Update, error) {
+	updatesChan := make(chan Update, poolSize)
+	offset := -1
+
+	go func() {
+		for {
+			time.Sleep(100)
+
+			params := url.Values{}
+			if offset != -1 {
+				params.Add("offset", strconv.Itoa(offset))
+			}
+
+			resp, err := bot.makeRequest("getUpdates", params)
+			if err != nil {
+				return
+			}
+			var updates []Update
+
+			err = json.Unmarshal(resp.Result, &updates)
+			if err != nil {
+				return
+			}
+
+			for _, v := range updates {
+				offset = v.UpdateID + 1
+				updatesChan <- v
+			}
+		}
+	}()
+
+	return updatesChan, nil
 }
 
 func (bot *Bot) updateHandler(w http.ResponseWriter, r *http.Request) {
@@ -112,14 +182,14 @@ func (bot *Bot) updateHandler(w http.ResponseWriter, r *http.Request) {
 
 		bot.log(fmt.Sprintf("[%s] %s", update.Message.From.UserName, update.Message.Text))
 
-		quotes, err := bash.GetQuotes("random", 1)
+		quotes, err := bash.GetQuotes("random")
 		if err != nil {
 			return nil
 		}
 
-		for _, v := range quotes {
-			bot.sendText(update.Message.Chat.ID, v.Text)
-		}
+		//for _, v := range quotes {
+		bot.sendText(update.Message.Chat.ID, quotes[0])
+		//}
 
 		return nil
 
@@ -158,7 +228,7 @@ func (bot *Bot) makeRequest(method string, params url.Values) (APIResponse, erro
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return APIResponse{}, errors.New(http.StatusText(resp.StatusCode))
+		return APIResponse{}, ErrAPINotOk
 	}
 
 	bytes, err := ioutil.ReadAll(resp.Body)
@@ -176,7 +246,6 @@ func (bot *Bot) makeRequest(method string, params url.Values) (APIResponse, erro
 	return apiResp, nil
 }
 
-// makeMessageRequest makes a request to a method that returns a Message.
 func (bot *Bot) makeMessageRequest(endpoint string, params url.Values) (Message, error) {
 	resp, err := bot.makeRequest(endpoint, params)
 	if err != nil {

@@ -1,66 +1,70 @@
 package bash
 
 import (
-	"encoding/json"
-	"fmt"
-	"io/ioutil"
-	"net/http"
-	"strings"
+	"golang.org/x/net/html"
 )
 
-// Quote comment... wtf
-type Quote struct {
-	Site string `json:"site"`
-	Name string `json:"name"`
-	Desc string `json:"desc"`
-	Link string `json:"link"`
-	Text string `json:"elementPureHtml"`
+func getAttribute(n *html.Node, key string) (string, bool) {
+	for _, attr := range n.Attr {
+		if attr.Key == key {
+			return attr.Val, true
+		}
+	}
+	return "", false
 }
 
-// GetQuotes comment... wtf
-func GetQuotes(topic string, n int) ([]Quote, error) {
-	data, err := readData(topic, n)
-	if err != nil {
-		return nil, err
+func checkID(n *html.Node, id string) bool {
+	if n.Type == html.ElementNode {
+		s, ok := getAttribute(n, "id")
+		if ok && s == id {
+			return true
+		}
 	}
-
-	var quotes []Quote
-	if err := json.Unmarshal(data, &quotes); err != nil {
-		return nil, err
-	}
-
-	processText(&quotes)
-
-	return quotes, nil
+	return false
 }
 
-func readData(topic string, n int) ([]byte, error) {
-	address := fmt.Sprintf("http://umorili.herokuapp.com/api/get?site=bash.im&name=%s&num=%d", topic, n)
-
-	res, err := http.Get(address)
-	if err != nil {
-		return nil, err
+func checkClass(n *html.Node, class string) bool {
+	if n.Type == html.ElementNode {
+		s, ok := getAttribute(n, "class")
+		if ok && s == class {
+			return true
+		}
 	}
-	defer res.Body.Close()
-
-	data, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	fmt.Println(string(data))
-
-	return data, nil
+	return false
 }
 
-func processText(quotes *[]Quote) {
-	replacer := strings.NewReplacer("<p>", "",
-		"</p>", "",
-		"<br />", "",
-		"&nbsp;", " ",
-		"&raquo;", "»",
-		"&laquo;", "«")
-	for i := range *quotes {
-		(*quotes)[i].Text = replacer.Replace((*quotes)[i].Text)
+func traverseID(n *html.Node, id string) *html.Node {
+	if checkID(n, id) {
+		return n
 	}
+
+	for c := n.FirstChild; c != nil; c = c.NextSibling {
+		result := traverseID(c, id)
+		if result != nil {
+			return result
+		}
+	}
+
+	return nil
+}
+
+func getElementByID(n *html.Node, id string) *html.Node {
+	return traverseID(n, id)
+}
+
+func traverseClass(n *html.Node, class string) []*html.Node {
+	result := make([]*html.Node, 0, 1)
+	if checkClass(n, class) {
+		result = append(result, n)
+	}
+
+	for c := n.FirstChild; c != nil; c = c.NextSibling {
+		result = append(result, traverseClass(c, class)...)
+	}
+
+	return result
+}
+
+func getElementByClass(n *html.Node, class string) []*html.Node {
+	return traverseClass(n, class)
 }
