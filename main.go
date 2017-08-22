@@ -7,5 +7,5 @@ import (
 )
 
 func main() {
-	log.Fatal(telegram.StartBot("./config.json"))
+	log.Fatal(telegram.StartBot("./config.yaml"))
 }

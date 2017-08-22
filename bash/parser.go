@@ -29,8 +29,8 @@ func traverseClass(n *html.Node, class string) []*html.Node {
 		result = append(result, n)
 	}
 
-	for c := n.FirstChild; c != nil; c = c.NextSibling {
-		result = append(result, traverseClass(c, class)...)
+	for child := n.FirstChild; child != nil; child = child.NextSibling {
+		result = append(result, traverseClass(child, class)...)
 	}
 
 	return result

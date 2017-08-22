@@ -2,13 +2,14 @@ package telegram
 
 import (
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"net/url"
 	"strconv"
 	"time"
+
+	yaml "gopkg.in/yaml.v2"
 
 	"../bash"
 )
@@ -60,10 +61,11 @@ func StartBot(configPath string) error {
 	log.Println("config found...")
 
 	var config Config
-	err = json.Unmarshal(bytes, &config)
+	err = yaml.Unmarshal(bytes, &config)
 	if err != nil {
 		log.Fatal(err)
 	}
+	log.Println(config)
 	log.Println("config correct...")
 
 	bot, err := newBot(config.Token, config.TimeOut, config.PoolSize)
@@ -147,7 +149,6 @@ func (bot *Bot) getUpdatesChannel(poolSize int) (<-chan *Update, error) {
 				log.Println(err)
 				continue
 			}
-
 			for _, v := range updates {
 				offset = v.UpdateID + 1
 				updatesChannel <- v
@@ -195,7 +196,7 @@ func (bot *Bot) processUpdate(update *Update) error {
 		return ErrAPINoMessage
 	}
 
-	bot.log(fmt.Sprintf("[%s] %s", update.Message.From.UserName, update.Message.Text))
+	//bot.log(fmt.Sprintf("[%s] %s", update.Message.From.UserName, update.Message.Text))
 
 	text := update.Message.Text
 

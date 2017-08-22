@@ -22,13 +22,13 @@ var (
 
 // Config of bot
 type Config struct {
-	Token    string        `json:"token"`
-	Cert     string        `json:"cert"`
-	PKey     string        `json:"pkey"`
-	Host     string        `json:"host"`
-	Port     string        `json:"port"`
-	PoolSize int           `json:"pool_size"`
-	TimeOut  time.Duration `json:"timeout"`
+	Token    string        `yaml:"token"`
+	Cert     string        `yaml:"cert"`
+	PKey     string        `yaml:"pkey"`
+	Host     string        `yaml:"host"`
+	Port     string        `yaml:"port"`
+	PoolSize int           `yaml:"pool_size"`
+	TimeOut  time.Duration `yaml:"timeout"`
 }
 
 // Keys bash (rus)
