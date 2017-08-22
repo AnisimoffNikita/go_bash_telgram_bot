@@ -34,7 +34,7 @@ type Update struct {
 
 // Chat type telegram
 type Chat struct {
-	ID        int64  `json:"id"`
+	ID        int    `json:"id"`
 	Type      string `json:"type"`
 	Title     string `json:"title"`
 	UserName  string `json:"username"`
@@ -49,4 +49,43 @@ type Message struct {
 	Date      int    `json:"date"`
 	Chat      *Chat  `json:"chat"`
 	Text      string `json:"text"` // optional
+}
+
+// ReplyKeyboardMarkup type telegram
+type ReplyKeyboardMarkup struct {
+	Keyboard        [][]KeyboardButton `json:"keyboard"`
+	ResizeKeyboard  bool               `json:"resize_keyboard"`
+	OneTimeKeyboard bool               `json:"one_time_keyboard"`
+	Selective       bool               `json:"selective"`
+}
+
+// ReplyKeyboardRemove type telegram
+type ReplyKeyboardRemove struct {
+	RemoveKeyboard bool `json:"remove_keyboard"`
+	Selective      bool `json:"selective"`
+}
+
+// KeyboardButton type telegram
+type KeyboardButton struct {
+	Text string `json:"text"`
+}
+
+func newReplyKeyboardMarkup(text [][]string) ReplyKeyboardMarkup {
+
+	buttons := make([][]KeyboardButton, len(text))
+	for i, v := range text {
+		buttons[i] = make([]KeyboardButton, len(v))
+		for j := range v {
+			buttons[i][j].Text = text[i][j]
+		}
+	}
+
+	keybord := ReplyKeyboardMarkup{
+		Keyboard:        buttons,
+		ResizeKeyboard:  true,
+		OneTimeKeyboard: false,
+		Selective:       true,
+	}
+
+	return keybord
 }

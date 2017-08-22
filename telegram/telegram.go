@@ -1,18 +1,12 @@
 package telegram
 
 import (
-	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"log"
-	"mime/multipart"
 	"net/http"
 	"net/url"
-	"os"
-	"path/filepath"
 	"strconv"
 	"time"
 
@@ -115,15 +109,15 @@ func (bot *Bot) processUpdatesChannel() error {
 	}
 
 	for update := range updates {
+		go func(update *Update) {
+			_, err := bot.Pool.AddTaskSyncTimed(func() interface{} {
+				return bot.processUpdate(update)
+			}, bot.TimeOut)
 
-		_, err := bot.Pool.AddTaskSyncTimed(func() interface{} {
-			return bot.processUpdate(update)
-		}, bot.TimeOut)
-
-		if err != nil {
-			log.Println(err)
-		}
-
+			if err != nil {
+				log.Println(err)
+			}
+		}(update)
 	}
 	return nil
 }
@@ -182,22 +176,6 @@ func (bot *Bot) updateHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (bot *Bot) processUpdate(update *Update) error {
-	if update.Message == nil {
-		return ErrAPINoMessage
-	}
-
-	bot.log(fmt.Sprintf("[%s] %s", update.Message.From.UserName, update.Message.Text))
-
-	quotes, err := bash.GetQuotes(update.Message.Text)
-	if err != nil {
-		return err
-	}
-
-	_, err = bot.sendText(update.Message.Chat.ID, quotes[0])
-	return err
-}
-
 func (bot *Bot) setWebhook(webhookConfig *WebhookConfig) (APIResponse, error) {
 	params := make(map[string]string)
 	params["url"] = webhookConfig.URL.String()
@@ -212,142 +190,33 @@ func (bot *Bot) setWebhook(webhookConfig *WebhookConfig) (APIResponse, error) {
 	return resp, nil
 }
 
-func (bot *Bot) makeRequest(method string, params url.Values) (APIResponse, error) {
-	endpoint := fmt.Sprintf(TelegramEndpoint, bot.Token, method)
-
-	resp, err := bot.Client.PostForm(endpoint, params)
-	if err != nil {
-		return APIResponse{}, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == http.StatusForbidden {
-		return APIResponse{}, ErrAPIForbidden
+func (bot *Bot) processUpdate(update *Update) error {
+	if update.Message == nil {
+		return ErrAPINoMessage
 	}
 
-	if resp.StatusCode != http.StatusOK {
-		return APIResponse{}, ErrAPINotOk
+	bot.log(fmt.Sprintf("[%s] %s", update.Message.From.UserName, update.Message.Text))
+
+	text := update.Message.Text
+
+	theme, ok := Themes[text]
+	if ok {
+		quotes, err := bash.GetQuotes(theme)
+		if err != nil {
+			return err
+		}
+
+		buttons := newReplyKeyboardMarkup([][]string{
+			{Keys[0]},
+			{Keys[1], Keys[2]},
+			{Keys[3], Keys[4]},
+			{Keys[5], Keys[6]},
+		})
+
+		_, err = bot.sendTextWithKeybord(update.Message.Chat.ID, quotes[0], buttons)
+		return err
 	}
+	_, err := bot.sendText(update.Message.Chat.ID, "ошибочка, сорян")
+	return err
 
-	bytes, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return APIResponse{}, err
-	}
-
-	var apiResp APIResponse
-	json.Unmarshal(bytes, &apiResp)
-
-	if !apiResp.Ok {
-		return apiResp, errors.New(apiResp.Description)
-	}
-
-	return apiResp, nil
-}
-
-func (bot *Bot) makeMessageRequest(endpoint string, params url.Values) (Message, error) {
-	resp, err := bot.makeRequest(endpoint, params)
-	if err != nil {
-		return Message{}, err
-	}
-
-	var message Message
-	json.Unmarshal(resp.Result, &message)
-
-	return message, nil
-}
-
-func (bot *Bot) uploadFile(method string, params map[string]string, param string, path string) (APIResponse, error) {
-
-	req, err := bot.uploadFileRequest(method, params, param, path)
-	if err != nil {
-		return APIResponse{}, err
-	}
-
-	res, err := bot.Client.Do(req)
-	if err != nil {
-		return APIResponse{}, err
-	}
-	defer res.Body.Close()
-
-	bytes, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		return APIResponse{}, err
-	}
-
-	var apiResp APIResponse
-
-	if err := json.Unmarshal(bytes, &apiResp); err != nil {
-		return APIResponse{}, err
-	}
-
-	if !apiResp.Ok {
-		return APIResponse{}, errors.New(apiResp.Description)
-	}
-
-	return apiResp, nil
-}
-
-func (bot *Bot) uploadFileRequest(method string, params map[string]string, param string, path string) (*http.Request, error) {
-	file, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-
-	body := &bytes.Buffer{}
-	writer := multipart.NewWriter(body)
-	part, err := writer.CreateFormFile(param, filepath.Base(path))
-	if err != nil {
-		return nil, err
-	}
-	_, err = io.Copy(part, file)
-	if err != nil {
-		return nil, err
-	}
-
-	for key, val := range params {
-		_ = writer.WriteField(key, val)
-	}
-	err = writer.Close()
-	if err != nil {
-		return nil, err
-	}
-
-	endpoint := fmt.Sprintf(TelegramEndpoint, bot.Token, method)
-
-	req, err := http.NewRequest("POST", endpoint, body)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Content-Type", writer.FormDataContentType())
-
-	return req, nil
-}
-
-func (bot *Bot) getMe() (User, error) {
-	resp, err := bot.makeRequest("getMe", nil)
-	if err != nil {
-		return User{}, err
-	}
-
-	var user User
-	if err := json.Unmarshal(resp.Result, &user); err != nil {
-		return User{}, err
-	}
-
-	return user, nil
-}
-
-func (bot *Bot) sendText(chatID int64, text string) (Message, error) {
-	params := url.Values{}
-	params.Add("chat_id", strconv.FormatInt(chatID, 10))
-	params.Add("text", text)
-
-	message, err := bot.makeMessageRequest("sendMessage", params)
-
-	if err != nil {
-		return Message{}, err
-	}
-
-	return message, nil
 }
