@@ -29,28 +29,34 @@ type Config struct {
 	Port     string        `yaml:"port"`
 	PoolSize int           `yaml:"pool_size"`
 	TimeOut  time.Duration `yaml:"timeout"`
+	Debug    bool          `yaml:"debug"`
 }
 
 // Keys bash (rus)
-var Keys = []string{
-	"случайные",
-	"новые",
-	"по рейтингу",
-	"лучшие",
-	"Бездна",
-	"топ Бездны",
-	"лучшие Бездны",
-}
+var (
+	Random    = "случайные"
+	New       = "новые"
+	ByRating  = "по рейтингу"
+	Best      = "лучшие"
+	Abyss     = "Бездна"
+	AbyssTop  = "топ Бездны"
+	AbyssBest = "лучшие Бездны"
+)
+
+// Setting key
+var (
+	Settings = "Настройки"
+)
 
 // Themes bash
 var Themes = map[string]string{
-	Keys[0]: "random",
-	Keys[1]: "",
-	Keys[2]: "byrating",
-	Keys[3]: "best",
-	Keys[4]: "abyss",
-	Keys[5]: "abysstop",
-	Keys[6]: "abyssbest",
+	Random:    "random",
+	New:       "",
+	ByRating:  "byrating",
+	Best:      "best",
+	Abyss:     "abyss",
+	AbyssTop:  "abysstop",
+	AbyssBest: "abyssbest",
 }
 
 // WebhookConfig struct

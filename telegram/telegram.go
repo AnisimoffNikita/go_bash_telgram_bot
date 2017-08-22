@@ -24,13 +24,7 @@ type Bot struct {
 	Debug   bool
 }
 
-func (bot *Bot) log(l string) {
-	if bot.Debug {
-		log.Println(l)
-	}
-}
-
-func newBot(token string, timeout time.Duration, poolSize int) (*Bot, error) {
+func newBot(token string, timeout time.Duration, poolSize int, debug bool) (*Bot, error) {
 	bot := &Bot{
 		Token:   token,
 		Client:  &http.Client{},
@@ -38,7 +32,7 @@ func newBot(token string, timeout time.Duration, poolSize int) (*Bot, error) {
 		TimeOut: timeout * time.Millisecond,
 	}
 
-	bot.Debug = true
+	bot.Debug = debug
 
 	bot.Pool.Run()
 
@@ -65,10 +59,9 @@ func StartBot(configPath string) error {
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Println(config)
 	log.Println("config correct...")
 
-	bot, err := newBot(config.Token, config.TimeOut, config.PoolSize)
+	bot, err := newBot(config.Token, config.TimeOut, config.PoolSize, config.Debug)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -196,28 +189,46 @@ func (bot *Bot) processUpdate(update *Update) error {
 		return ErrAPINoMessage
 	}
 
-	//bot.log(fmt.Sprintf("[%s] %s", update.Message.From.UserName, update.Message.Text))
-
 	text := update.Message.Text
 
 	theme, ok := Themes[text]
 	if ok {
-		quotes, err := bash.GetQuotes(theme)
-		if err != nil {
-			return err
-		}
-
-		buttons := newReplyKeyboardMarkup([][]string{
-			{Keys[0]},
-			{Keys[1], Keys[2]},
-			{Keys[3], Keys[4]},
-			{Keys[5], Keys[6]},
-		})
-
-		_, err = bot.sendTextWithKeybord(update.Message.Chat.ID, quotes[0], buttons)
-		return err
+		bot.sendQuote(update.Message.Chat.ID, theme)
 	}
+
+	if text == Settings {
+		bot.sendSettings(update.Message.Chat.ID)
+	}
+
 	_, err := bot.sendText(update.Message.Chat.ID, "ошибочка, сорян")
 	return err
+}
 
+func (bot *Bot) sendQuote(id int, theme string) error {
+	quotes, err := bash.GetQuotes(theme)
+	if err != nil {
+		return err
+	}
+
+	buttons := newReplyKeyboardMarkup([][]string{
+		{Random, New},
+		{ByRating, Best},
+		{Abyss, AbyssTop},
+		{AbyssBest, Settings},
+	})
+
+	_, err = bot.sendTextWithKeybord(id, quotes[0], buttons)
+	return err
+}
+
+func (bot *Bot) sendSettings(id int) error {
+	buttons := newReplyKeyboardMarkup([][]string{
+		{Random, New},
+		{ByRating, Best},
+		{Abyss, AbyssTop},
+		{AbyssBest, Settings},
+	})
+
+	_, err := bot.sendTextWithKeybord(id, "Скоро тут будут настройки...", buttons)
+	return err
 }
