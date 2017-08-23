@@ -43,8 +43,9 @@ var (
 	AbyssBest = "лучшие Бездны"
 )
 
-// Setting key
+// Other keys
 var (
+	Search   = "Поиск"
 	Settings = "Настройки"
 )
 

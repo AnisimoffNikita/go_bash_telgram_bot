@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"log"
+	"math/rand"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -16,20 +17,23 @@ import (
 
 // Bot struct
 type Bot struct {
-	Token   string
-	Self    User
-	Client  *http.Client
-	Pool    *Pool
-	TimeOut time.Duration
-	Debug   bool
+	Token         string
+	Self          User
+	Client        *http.Client
+	Pool          *Pool
+	TimeOut       time.Duration
+	Debug         bool
+	NextProcessor func(update *Update) error
+	LastQuote     bash.Quote
 }
 
 func newBot(token string, timeout time.Duration, poolSize int, debug bool) (*Bot, error) {
 	bot := &Bot{
-		Token:   token,
-		Client:  &http.Client{},
-		Pool:    NewPool(poolSize),
-		TimeOut: timeout * time.Millisecond,
+		Token:         token,
+		Client:        &http.Client{},
+		Pool:          NewPool(poolSize),
+		TimeOut:       timeout * time.Millisecond,
+		NextProcessor: nil,
 	}
 
 	bot.Debug = debug
@@ -106,6 +110,9 @@ func (bot *Bot) processUpdatesChannel() error {
 	for update := range updates {
 		go func(update *Update) {
 			_, err := bot.Pool.AddTaskSyncTimed(func() interface{} {
+				if bot.NextProcessor != nil {
+					return bot.NextProcessor(update)
+				}
 				return bot.processUpdate(update)
 			}, bot.TimeOut)
 
@@ -185,50 +192,79 @@ func (bot *Bot) setWebhook(webhookConfig *WebhookConfig) (APIResponse, error) {
 }
 
 func (bot *Bot) processUpdate(update *Update) error {
+	bot.NextProcessor = nil
+
 	if update.Message == nil {
 		return ErrAPINoMessage
 	}
 
 	text := update.Message.Text
+	id := update.Message.Chat.ID
 
-	theme, ok := Themes[text]
-	if ok {
-		bot.sendQuote(update.Message.Chat.ID, theme)
+	if text == "Случайная" {
+		return bot.sendRandom(id)
+	} else if text == "Сохраненные" {
+		//return bot.saved()
 	}
+	return bot.start(id)
+}
 
-	if text == Settings {
-		bot.sendSettings(update.Message.Chat.ID)
-	}
+func (bot *Bot) start(id int) error {
+	buttons := newReplyKeyboardMarkup([][]string{
+		{"Случайная"},
+		{"Сохраненные"},
+	})
 
-	_, err := bot.sendText(update.Message.Chat.ID, "ошибочка, сорян")
+	_, err := bot.sendTextWithKeybord(id, "Что отправить?", buttons)
 	return err
 }
 
-func (bot *Bot) sendQuote(id int, theme string) error {
-	quotes, err := bash.GetQuotes(theme)
+func (bot *Bot) sendRandom(id int) error {
+	quotes, err := bash.GetQuotes(Themes[Random])
 	if err != nil {
 		return err
 	}
 
 	buttons := newReplyKeyboardMarkup([][]string{
-		{Random, New},
-		{ByRating, Best},
-		{Abyss, AbyssTop},
-		{AbyssBest, Settings},
+		{"Другая"},
+		{"+", "-"},
+		{"[ : ||| : ]"},
+		{"Назад"},
 	})
 
-	_, err = bot.sendTextWithKeybord(id, quotes[0], buttons)
+	bot.LastQuote = quotes[rand.Intn(len(quotes))]
+	bot.NextProcessor = bot.feedbackQuote
+
+	_, err = bot.sendTextWithKeybord(id, bash.QuoteToString(bot.LastQuote), buttons)
+
 	return err
 }
 
-func (bot *Bot) sendSettings(id int) error {
-	buttons := newReplyKeyboardMarkup([][]string{
-		{Random, New},
-		{ByRating, Best},
-		{Abyss, AbyssTop},
-		{AbyssBest, Settings},
-	})
+func (bot *Bot) feedbackQuote(update *Update) error {
+	bot.NextProcessor = nil
 
-	_, err := bot.sendTextWithKeybord(id, "Скоро тут будут настройки...", buttons)
+	if update.Message == nil {
+		return ErrAPINoMessage
+	}
+
+	text := update.Message.Text
+	id := update.Message.Chat.ID
+
+	if text == "Другая" {
+		return bot.sendRandom(id)
+	} else if text == "+" {
+		go bash.Plus(bot.LastQuote.ID)
+		return bot.sendRandom(id)
+	} else if text == "-" {
+		go bash.Minus(bot.LastQuote.ID)
+		return bot.sendRandom(id)
+	} else if text == "[ : ||| : ]" {
+		go bash.Bayan(bot.LastQuote.ID)
+		return bot.sendRandom(id)
+	} else if text == "Назад" {
+		return bot.start(id)
+	}
+
+	_, err := bot.sendText(update.Message.Chat.ID, "ошибочка, сорян")
 	return err
 }

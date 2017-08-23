@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
+	"strings"
 
 	"golang.org/x/net/html"
 	"golang.org/x/net/html/charset"
@@ -15,8 +17,15 @@ const (
 	BashEndpoint = "http://bash.im/%s"
 )
 
+// Quote struct
+type Quote struct {
+	Text   string
+	Rating string
+	ID     string
+}
+
 // GetQuotes comment... wtf
-func GetQuotes(topic string) ([]string, error) {
+func GetQuotes(topic string) ([]Quote, error) {
 	address := fmt.Sprintf(BashEndpoint, topic)
 
 	res, err := http.Get(address)
@@ -40,20 +49,83 @@ func GetQuotes(topic string) ([]string, error) {
 		return nil, err
 	}
 
-	nodes := getElementByClass(node, "text")
+	quoteNodes := getElementByClass(node, "quote")
+	quotes := make([]Quote, len(quoteNodes))
 
-	result := make([]string, len(nodes))
-	for i, v := range nodes {
-		result[i] = ""
-		for c := v.FirstChild; c != nil; c = c.NextSibling {
+	for i, q := range quoteNodes {
+		idNode := getElementByClass(q, "id")[0]
+		ratingNode := getElementByClass(q, "rating")[0] // there is only one class
+		textNode := getElementByClass(q, "text")[0]     // there is only one class
+		quotes[i].ID = idNode.FirstChild.Data[1:]       // # char skip
+		quotes[i].Rating = ratingNode.FirstChild.Data
+		quotes[i].Text = ""
+		for c := textNode.FirstChild; c != nil; c = c.NextSibling {
 			if c.Data == "br" {
-				result[i] += "\n"
+				quotes[i].Text += "\n"
+			} else if c.Data == "a" {
+				// TODO
 			} else {
-				result[i] += c.Data
+				quotes[i].Text += c.Data
 			}
 		}
 	}
 
-	return result, nil
+	return quotes, nil
+}
 
+// QuoteToString convers Quote to String
+func QuoteToString(quote Quote) string {
+	str := ""
+
+	str += quote.Text + "\n\n"
+	str += "# " + quote.ID + "\n"
+	str += "+ " + quote.Rating + "\n"
+
+	return str
+}
+
+// Plus request
+func Plus(id string) {
+	address := fmt.Sprintf("http://bash.im/quote/%s/rulez", id)
+
+	data := fmt.Sprintf("quote=%s&act=rulez", id)
+
+	client := &http.Client{}
+	req, _ := http.NewRequest("POST", address, strings.NewReader(data))
+	req.Header.Add("Referer", "http://bash.im/")
+
+	log.Println(req)
+
+	resp, _ := client.Do(req)
+	defer resp.Body.Close()
+}
+
+// Minus request
+func Minus(id string) {
+	address := fmt.Sprintf("http://bash.im/quote/%s/sux", id)
+	log.Println(address)
+
+	data := fmt.Sprintf("quote=%s&act=sux", id)
+
+	client := &http.Client{}
+	req, _ := http.NewRequest("POST", address, strings.NewReader(data))
+	req.Header.Add("Referer", "http://bash.im/")
+	resp, _ := client.Do(req)
+	defer resp.Body.Close()
+}
+
+// Bayan request
+func Bayan(id string) {
+	address := fmt.Sprintf("http://bash.im/quote/%s/bayan", id)
+
+	data := fmt.Sprintf("quote=%s&act=bayan", id)
+
+	client := &http.Client{}
+	req, _ := http.NewRequest("POST", address, strings.NewReader(data))
+	req.Header.Add("Referer", "http://bash.im/")
+
+	log.Println(req)
+
+	resp, _ := client.Do(req)
+	defer resp.Body.Close()
 }
