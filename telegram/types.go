@@ -84,7 +84,7 @@ func newReplyKeyboardMarkup(text [][]string) ReplyKeyboardMarkup {
 		Keyboard:        buttons,
 		ResizeKeyboard:  true,
 		OneTimeKeyboard: false,
-		Selective:       true,
+		Selective:       false,
 	}
 
 	return keybord

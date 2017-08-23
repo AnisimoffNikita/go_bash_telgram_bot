@@ -32,33 +32,18 @@ type Config struct {
 	Debug    bool          `yaml:"debug"`
 }
 
-// Keys bash (rus)
-var (
-	Random    = "случайные"
-	New       = "новые"
-	ByRating  = "по рейтингу"
-	Best      = "лучшие"
-	Abyss     = "Бездна"
-	AbyssTop  = "топ Бездны"
-	AbyssBest = "лучшие Бездны"
+// Menu constants
+const (
+	Start  = "/start"
+	Random = "Случайную"
+	Search = "Поиск"
+	Saved  = "Сохранненые"
+	Plus   = "➕"
+	Minus  = "➖"
+	Bayan  = "[ : ||| : ]"
+	Other  = "Еще одну"
+	Back   = "Назад"
 )
-
-// Other keys
-var (
-	Search   = "Поиск"
-	Settings = "Настройки"
-)
-
-// Themes bash
-var Themes = map[string]string{
-	Random:    "random",
-	New:       "",
-	ByRating:  "byrating",
-	Best:      "best",
-	Abyss:     "abyss",
-	AbyssTop:  "abysstop",
-	AbyssBest: "abyssbest",
-}
 
 // WebhookConfig struct
 type WebhookConfig struct {
