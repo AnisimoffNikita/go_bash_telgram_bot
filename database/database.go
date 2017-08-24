@@ -1,6 +1,7 @@
 package database
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"time"
@@ -35,45 +36,74 @@ func init() {
 	}
 }
 
-// SaveQuote saves quote to db
-func SaveQuote(chatID string, quoteID string) error {
-	return nil
+// SetLastQuote func
+func SetLastQuote(chatID int, quoteID string) error {
+	return setString(quoteDB, chatID, quoteID)
 }
 
-// DeleteQuote deletes quote to db
-func DeleteQuote(chatID, quoteID string) error {
-	return nil
+// GetLastQuote func
+func GetLastQuote(chatID int) (string, error) {
+	return getString(quoteDB, chatID)
 }
 
-func SetLastQuote(chatID, quoteID string) error {
-	_, err := db.Insert(quoteDB, []interface{}{chatID, quoteID})
+// RemoveLastQuote func
+func RemoveLastQuote(chatID int) error {
+	return deleteSpace(quoteDB, chatID)
+}
+
+// TruncateLastQuotes func
+func TruncateLastQuotes() error {
+	return truncateSpace(quoteDB)
+}
+
+// SetProcessor func
+func SetProcessor(chatID int, processor string) error {
+	return setString(processorsDB, chatID, processor)
+}
+
+// GetProcessor func
+func GetProcessor(chatID int) (string, error) {
+	return getString(processorsDB, chatID)
+}
+
+// RemoveProcessor func
+func RemoveProcessor(chatID int) error {
+	return deleteSpace(processorsDB, chatID)
+}
+
+// TruncateProcessor func
+func TruncateProcessor() error {
+	return truncateSpace(processorsDB)
+}
+
+func setString(name string, id int, str string) error {
+	_, err := db.Upsert(name, []interface{}{id, str}, []interface{}{[]interface{}{"=", 1, str}})
 	return err
 }
 
-func HasLastQuote(chatID string) (bool, error) {
-	resp, err := db.Select(quoteDB, primary, 0, 1, tarantool.IterEq, []interface{}{chatID})
+func getString(name string, id int) (string, error) {
+	resp, err := db.Select(name, primary, 0, 1, tarantool.IterEq, []interface{}{id})
+	if err != nil {
+		return "", err
+	}
+
+	if len(resp.Tuples()) == 0 {
+		return "", errors.New("no processor")
+	}
+
+	processor, ok := resp.Tuples()[0][1].(string)
+	if !ok {
+		return "0", errors.New("incorrect field")
+	}
+	return processor, nil
 }
 
-func RemoveLastQuote(chatID string) error {
-	_, err := db.Delete(quoteDB, primary, []interface{}{chatID})
+func deleteSpace(name string, id int) error {
+	_, err := db.Delete(name, primary, []interface{}{id})
 	return err
 }
 
-func TruncateLastQuote() error {
-	return truncateDB(quoteDB)
-}
-
-func SetNextProcessor(chatID, processor string) error {
-	_, err := db.Insert(processorsDB, []interface{}{chatID, processor})
-	return err
-}
-
-func RemoveNextProcessor(chatID string) error {
-	_, err := db.Delete(processorsDB, primary, []interface{}{chatID})
-	return err
-}
-
-func truncateDB(name string) error {
+func truncateSpace(name string) error {
 	rawQuery := fmt.Sprintf("box.space.%s:truncate()", name)
 	_, err := db.Eval(rawQuery, []interface{}{})
 	return err

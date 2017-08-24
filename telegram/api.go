@@ -15,6 +15,20 @@ import (
 	"strconv"
 )
 
+// API endpoint mask
+const (
+	TelegramEndpoint = "https://api.telegram.org/bot%s/%s"
+)
+
+// Errors
+var (
+	ErrAPIKeybord   = errors.New("keybord setting error")
+	ErrAPINoMessage = errors.New("not message")
+	ErrAPINotOk     = errors.New("not ok")
+	ErrAPIForbidden = errors.New("forbidden")
+	ErrJobTimedOut  = errors.New("job request timed out")
+)
+
 // BotAPI struct
 type BotAPI struct {
 	Token  string
@@ -22,7 +36,8 @@ type BotAPI struct {
 	Client *http.Client
 }
 
-func (bot *BotAPI) makeRequest(method string, params url.Values) (APIResponse, error) {
+// MakeRequest makes arbitary query
+func (bot *BotAPI) MakeRequest(method string, params url.Values) (APIResponse, error) {
 	endpoint := fmt.Sprintf(TelegramEndpoint, bot.Token, method)
 
 	resp, err := bot.Client.PostForm(endpoint, params)
@@ -55,7 +70,7 @@ func (bot *BotAPI) makeRequest(method string, params url.Values) (APIResponse, e
 }
 
 func (bot *BotAPI) makeMessageRequest(endpoint string, params url.Values) (Message, error) {
-	resp, err := bot.makeRequest(endpoint, params)
+	resp, err := bot.MakeRequest(endpoint, params)
 	if err != nil {
 		return Message{}, err
 	}
@@ -66,7 +81,8 @@ func (bot *BotAPI) makeMessageRequest(endpoint string, params url.Values) (Messa
 	return message, nil
 }
 
-func (bot *BotAPI) uploadFile(method string, params map[string]string, param string, path string) (APIResponse, error) {
+// UploadFile Method
+func (bot *BotAPI) UploadFile(method string, params map[string]string, param string, path string) (APIResponse, error) {
 
 	req, err := bot.uploadFileRequest(method, params, param, path)
 	if err != nil {
@@ -134,8 +150,9 @@ func (bot *BotAPI) uploadFileRequest(method string, params map[string]string, pa
 	return req, nil
 }
 
-func (bot *BotAPI) getMe() (User, error) {
-	resp, err := bot.makeRequest("getMe", nil)
+// GetMe method
+func (bot *BotAPI) GetMe() (User, error) {
+	resp, err := bot.MakeRequest("getMe", nil)
 	if err != nil {
 		return User{}, err
 	}
@@ -148,7 +165,8 @@ func (bot *BotAPI) getMe() (User, error) {
 	return user, nil
 }
 
-func (bot *BotAPI) sendText(chatID int, text string) (Message, error) {
+// SendText Method
+func (bot *BotAPI) SendText(chatID int, text string) (Message, error) {
 	params := url.Values{}
 	params.Add("chat_id", strconv.Itoa(chatID))
 	params.Add("text", text)
@@ -162,7 +180,8 @@ func (bot *BotAPI) sendText(chatID int, text string) (Message, error) {
 	return message, nil
 }
 
-func (bot *BotAPI) sendTextWithKeybord(chatID int, text string, keybord ReplyKeyboardMarkup) (Message, error) {
+// SendTextWithKeybord Method
+func (bot *BotAPI) SendTextWithKeybord(chatID int, text string, keybord ReplyKeyboardMarkup) (Message, error) {
 	params := url.Values{}
 	params.Add("chat_id", strconv.Itoa(chatID))
 	params.Add("text", text)
@@ -183,7 +202,8 @@ func (bot *BotAPI) sendTextWithKeybord(chatID int, text string, keybord ReplyKey
 	return message, nil
 }
 
-func (bot *BotAPI) sendTextWithoutKeybord(chatID int, text string) (Message, error) {
+// SendTextWithoutKeybord Method
+func (bot *BotAPI) SendTextWithoutKeybord(chatID int, text string) (Message, error) {
 	params := url.Values{}
 	params.Add("chat_id", strconv.Itoa(chatID))
 	params.Add("text", text)

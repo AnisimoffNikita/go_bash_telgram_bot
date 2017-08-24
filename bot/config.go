@@ -1,7 +1,6 @@
-package telegram
+package bot
 
 import (
-	"errors"
 	"net/url"
 	"time"
 )
@@ -9,15 +8,6 @@ import (
 // API endpoint mask
 const (
 	TelegramEndpoint = "https://api.telegram.org/bot%s/%s"
-)
-
-// Errors
-var (
-	ErrAPIKeybord   = errors.New("keybord setting error")
-	ErrAPINoMessage = errors.New("not message")
-	ErrAPINotOk     = errors.New("not ok")
-	ErrAPIForbidden = errors.New("forbidden")
-	ErrJobTimedOut  = errors.New("job request timed out")
 )
 
 // Config of bot

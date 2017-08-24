@@ -68,7 +68,6 @@ func QuoteToString(quote Quote) string {
 // Plus request
 func Plus(id string) {
 	address := fmt.Sprintf("http://bash.im/quote/%s/rulez", id)
-
 	data := fmt.Sprintf("quote=%s&act=rulez", id)
 
 	client := &http.Client{}
@@ -76,6 +75,7 @@ func Plus(id string) {
 	req.Header.Add("Referer", "http://bash.im/")
 
 	resp, _ := client.Do(req)
+
 	defer resp.Body.Close()
 }
 

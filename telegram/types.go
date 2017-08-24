@@ -70,7 +70,8 @@ type KeyboardButton struct {
 	Text string `json:"text"`
 }
 
-func newReplyKeyboardMarkup(text [][]string) ReplyKeyboardMarkup {
+//NewReplyKeyboardMarkup create new keybord
+func NewReplyKeyboardMarkup(text [][]string) ReplyKeyboardMarkup {
 
 	buttons := make([][]KeyboardButton, len(text))
 	for i, v := range text {
