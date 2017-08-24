@@ -7,7 +7,7 @@ import (
 
 	tarantool "github.com/tarantool/go-tarantool"
 
-	"../helper"
+	"github.com/AnisimoffNikita/go_bash_telgram_bot/helper"
 )
 
 var db *tarantool.Connection

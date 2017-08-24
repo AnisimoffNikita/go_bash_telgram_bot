@@ -11,11 +11,11 @@ import (
 	"strconv"
 	"time"
 
-	"../bash"
-	"../database"
-	"../helper"
-	"../pool"
-	"../telegram"
+	"github.com/AnisimoffNikita/go_bash_telgram_bot/bash"
+	"github.com/AnisimoffNikita/go_bash_telgram_bot/database"
+	"github.com/AnisimoffNikita/go_bash_telgram_bot/helper"
+	"github.com/AnisimoffNikita/go_bash_telgram_bot/pool"
+	"github.com/AnisimoffNikita/go_bash_telgram_bot/telegram"
 )
 
 // Bot struct
