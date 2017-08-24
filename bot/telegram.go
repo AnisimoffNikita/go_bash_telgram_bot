@@ -2,6 +2,7 @@ package bot
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"math/rand"
@@ -10,10 +11,9 @@ import (
 	"strconv"
 	"time"
 
-	yaml "gopkg.in/yaml.v2"
-
 	"../bash"
 	"../database"
+	"../helper"
 	"../pool"
 	"../telegram"
 )
@@ -71,20 +71,12 @@ func newBot(token string, timeout time.Duration, poolSize int, debug bool) (*Bot
 }
 
 // StartBot begin bot work
-func StartBot(configPath string) error {
-	bytes, err := ioutil.ReadFile(configPath)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	log.Println("config found...")
-
+func StartBot() error {
 	var config Config
-	err = yaml.Unmarshal(bytes, &config)
+	err := helper.GetYamlConfig(configPath, &config)
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Println("config correct...")
 
 	bot, err := newBot(config.Token, config.TimeOut, config.PoolSize, config.Debug)
 	if err != nil {
@@ -134,7 +126,7 @@ func (bot *Bot) processUpdatesChannel(channelSize int) error {
 
 	for update := range updates {
 		go func(update *telegram.Update) {
-			_, err := bot.Pool.AddTaskSyncTimed(func() interface{} {
+			res, err := bot.Pool.AddTaskSyncTimed(func() interface{} {
 				processor, err := database.GetProcessor(update.Message.Chat.ID)
 
 				if err != nil {
@@ -143,6 +135,9 @@ func (bot *Bot) processUpdatesChannel(channelSize int) error {
 				return bot.Processors[processor](update)
 			}, bot.TimeOut)
 
+			if res != nil {
+				log.Println(err)
+			}
 			if err != nil {
 				log.Println(err)
 			}
@@ -187,7 +182,7 @@ func (bot *Bot) getUpdatesChannel(poolSize int) (<-chan *telegram.Update, error)
 }
 
 func (bot *Bot) updateHandler(w http.ResponseWriter, r *http.Request) {
-	_, err := bot.Pool.AddTaskSyncTimed(func() interface{} {
+	res, err := bot.Pool.AddTaskSyncTimed(func() interface{} {
 		bytes, _ := ioutil.ReadAll(r.Body)
 
 		var update telegram.Update
@@ -204,6 +199,9 @@ func (bot *Bot) updateHandler(w http.ResponseWriter, r *http.Request) {
 	}, bot.TimeOut)
 
 	if err != nil {
+		log.Println(err)
+	}
+	if res != nil {
 		log.Println(err)
 	}
 }
@@ -256,16 +254,15 @@ func (bot *Bot) start(id int, greeting string) error {
 
 	_, err := bot.API.SendTextWithKeybord(id, greeting, buttons)
 	if err != nil {
-		log.Println("can't send start messsage")
+		return fmt.Errorf("can't send start messsage: %s", err)
 	}
-	return err
+	return nil
 }
 
 func (bot *Bot) sendRandom(id int) error {
 	quotes, err := bash.GetQuotes("random")
 	if err != nil {
-		log.Printf("can't get quotes: %s", err)
-		return bot.start(id, WeHaveAnError)
+		return fmt.Errorf("can't get quotes: %s", err)
 	}
 
 	buttons := telegram.NewReplyKeyboardMarkup([][]string{
@@ -278,22 +275,19 @@ func (bot *Bot) sendRandom(id int) error {
 
 	_, err = bot.API.SendTextWithKeybord(id, bash.QuoteToString(quote), buttons)
 	if err != nil {
-		log.Printf("can't send message %s", err)
-		return bot.start(id, WeHaveAnError)
+		return fmt.Errorf("can't send message %s", err)
 	}
 
 	err = database.SetProcessor(id, RandomProcessor)
 	if err != nil {
-		log.Printf("can't set processor %s", err)
-		return bot.start(id, WeHaveAnError)
+		return fmt.Errorf("can't set processor %s", err)
 	}
 	err = database.SetLastQuote(id, quote.ID)
 	if err != nil {
-		log.Printf("can't set quote%s", err)
-		return bot.start(id, WeHaveAnError)
+		return fmt.Errorf("can't set quote%s", err)
 	}
 
-	return err
+	return nil
 }
 
 func (bot *Bot) feedbackQuote(update *telegram.Update) error {
@@ -306,8 +300,7 @@ func (bot *Bot) feedbackQuote(update *telegram.Update) error {
 
 	lastQuote, err := database.GetLastQuote(id)
 	if err != nil {
-		log.Printf("can't get quote: %e", err)
-		return bot.start(id, WeHaveAnError)
+		return fmt.Errorf("can't get quote: %e", err)
 	}
 
 	if text == Other {
@@ -334,8 +327,14 @@ func (bot *Bot) feedbackQuote(update *telegram.Update) error {
 }
 
 func (bot *Bot) sendSearch(id int) error {
-	database.SetProcessor(id, StartSearchProcessor)
+	err := database.SetProcessor(id, StartSearchProcessor)
+	if err != nil {
+		return fmt.Errorf("can't set processor %s", err)
+	}
 	_, err := bot.API.SendTextWithoutKeybord(id, SearchReq)
+	if err != nil {
+		return fmt.Errorf("can't send message %s", err)
+	}
 	return err
 
 }
@@ -350,13 +349,11 @@ func (bot *Bot) startSearch(update *telegram.Update) error {
 
 	err := database.SetSearch(id, text, 0, "")
 	if err != nil {
-		log.Printf("can't set search %s", err)
-		return bot.start(id, WeHaveAnError)
+		return fmt.Errorf("can't set search %s", err)
 	}
 	err = database.SetProcessor(id, SearchProcessor)
 	if err != nil {
-		log.Printf("can't set processor%s", err)
-		return bot.start(id, WeHaveAnError)
+		return fmt.Errorf("can't set processor%s", err)
 	}
 	return bot.sendFound(id, text, 0)
 }
@@ -364,16 +361,14 @@ func (bot *Bot) startSearch(update *telegram.Update) error {
 func (bot *Bot) feedbackSearch(update *telegram.Update) error {
 
 	if update.Message == nil {
-		log.Printf("feedbackSaved error: %s", telegram.ErrAPINoMessage)
-		return bot.start(update.Message.Chat.ID, WeHaveAnError)
+		return fmt.Errorf("feedbackSaved error: %s", telegram.ErrAPINoMessage)
 	}
 
 	id := update.Message.Chat.ID
 
 	req, index, quote, err := database.GetSearch(id)
 	if err != nil {
-		log.Printf("can't get search: %s", err)
-		return bot.start(id, WeHaveAnError)
+		return fmt.Errorf("can't get search: %s", err)
 	}
 
 	text := update.Message.Text
@@ -400,8 +395,7 @@ func (bot *Bot) sendFound(id int, text string, index int) error {
 
 	quotes, err := bash.Search(text)
 	if err != nil {
-		log.Printf("can't search message: %s", err)
-		return bot.start(id, WeHaveAnError)
+		return fmt.Errorf("can't search message: %s", err)
 	}
 
 	buttons := telegram.NewReplyKeyboardMarkup([][]string{
@@ -417,14 +411,12 @@ func (bot *Bot) sendFound(id int, text string, index int) error {
 	quote := quotes[index]
 	_, err = bot.API.SendTextWithKeybord(id, bash.QuoteToString(quote), buttons)
 	if err != nil {
-		log.Printf("can't send message %s", err)
-		return bot.start(id, WeHaveAnError)
+		return fmt.Errorf("can't send message %s", err)
 	}
 
 	err = database.SetSearch(id, text, index+1, quote.ID)
 	if err != nil {
-		log.Printf("can't set quote%s", err)
-		return bot.start(id, WeHaveAnError)
+		return fmt.Errorf("can't set quote%s", err)
 	}
 	return err
 }
@@ -436,8 +428,7 @@ func (bot *Bot) sendSaved(id int) error {
 	}
 
 	if err != nil {
-		log.Printf("sendSaved error: %s", err)
-		return bot.start(id, WeHaveAnError)
+		return fmt.Errorf("sendSaved error: %s", err)
 	}
 
 	buttons := telegram.NewReplyKeyboardMarkup([][]string{
@@ -463,26 +454,22 @@ func (bot *Bot) sendSaved(id int) error {
 
 	quote, err := bash.GetQuoteByID(quoteID)
 	if err != nil {
-		log.Printf("can't get quote by id%s", err)
-		return bot.start(id, WeHaveAnError)
+		return fmt.Errorf("can't get quote by id: %s", err)
 	}
 
 	_, err = bot.API.SendTextWithKeybord(id, bash.QuoteToString(quote), buttons)
 	if err != nil {
-		log.Printf("can't send message %s", err)
-		return bot.start(id, WeHaveAnError)
+		return fmt.Errorf("can't send message: %s", err)
 	}
 
 	err = database.SetLastQuote(id, quote.ID)
 	if err != nil {
-		log.Printf(" can't set quote %s", err)
-		return bot.start(id, WeHaveAnError)
+		return fmt.Errorf("can't set quote: %s", err)
 	}
 
 	err = database.SetProcessor(id, SaveProcessor)
 	if err != nil {
-		log.Printf(" can't set processor: %s", err)
-		return bot.start(id, WeHaveAnError)
+		return fmt.Errorf("can't set processor: %s", err)
 	}
 
 	return err
@@ -490,8 +477,7 @@ func (bot *Bot) sendSaved(id int) error {
 
 func (bot *Bot) feedbackSaved(update *telegram.Update) error {
 	if update.Message == nil {
-		log.Printf("feedbackSaved error: %s", telegram.ErrAPINoMessage)
-		return bot.start(update.Message.Chat.ID, WeHaveAnError)
+		return fmt.Errorf("feedbackSaved error: %s", telegram.ErrAPINoMessage)
 	}
 
 	text := update.Message.Text
@@ -499,8 +485,7 @@ func (bot *Bot) feedbackSaved(update *telegram.Update) error {
 
 	lastQuote, err := database.GetLastQuote(id)
 	if err != nil {
-		log.Printf("feedbackSaved error: %s", err)
-		return bot.start(id, WeHaveAnError)
+		return fmt.Errorf("feedbackSaved error: %s", err)
 	}
 
 	if text == Other {
@@ -509,7 +494,7 @@ func (bot *Bot) feedbackSaved(update *telegram.Update) error {
 
 		err := database.DeleteSavedQuote(id, lastQuote)
 		if err != nil {
-			log.Printf("can't save quote: %s", err)
+			return fmt.Errorf("can't save quote: %s", err)
 		}
 		return bot.sendSaved(id)
 	} else if text == Back {

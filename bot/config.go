@@ -5,9 +5,8 @@ import (
 	"time"
 )
 
-// API endpoint mask
 const (
-	TelegramEndpoint = "https://api.telegram.org/bot%s/%s"
+	configPath = "config.yaml"
 )
 
 // Config of bot

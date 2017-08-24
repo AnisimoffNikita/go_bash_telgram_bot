@@ -6,6 +6,8 @@ import (
 	"time"
 
 	tarantool "github.com/tarantool/go-tarantool"
+
+	"../helper"
 )
 
 var db *tarantool.Connection
@@ -20,16 +22,22 @@ const (
 )
 
 func init() {
-	opts := tarantool.Opts{
-		Timeout:       time.Second,
-		Reconnect:     time.Second,
-		MaxReconnects: 5,
-		User:          "test",
-		Pass:          "test",
+
+	var config Config
+	err := helper.GetYamlConfig(ConfigPath, &config)
+	if err != nil {
+		log.Fatal(err)
 	}
 
-	var err error
-	db, err = tarantool.Connect("localhost:3301", opts)
+	opts := tarantool.Opts{
+		Timeout:       time.Duration(config.Timeout) * time.Second,
+		Reconnect:     time.Duration(config.Reconnect) * time.Second,
+		MaxReconnects: 5,
+		User:          config.User,
+		Pass:          config.Pass,
+	}
+
+	db, err = tarantool.Connect(fmt.Sprintf("%s:%s", config.Host, config.Port), opts)
 
 	if err != nil {
 		log.Fatalf("Can't connect to tarantool: %s", err)
