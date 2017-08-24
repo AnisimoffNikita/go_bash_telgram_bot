@@ -1,7 +1,6 @@
 package database
 
 import (
-	"errors"
 	"fmt"
 	"log"
 	"time"
@@ -89,12 +88,12 @@ func getString(name string, id int) (string, error) {
 	}
 
 	if len(resp.Tuples()) == 0 {
-		return "", errors.New("no fields")
+		return "", ErrEmpty
 	}
 
 	processor, ok := resp.Tuples()[0][1].(string)
 	if !ok {
-		return "0", errors.New("incorrect field")
+		return "0", ErrIncorrectType
 	}
 	return processor, nil
 }
@@ -128,21 +127,21 @@ func GetSearch(chatID int) (string, int, string, error) {
 	}
 
 	if len(resp.Tuples()) == 0 {
-		return "", -1, "", errors.New("no fields")
+		return "", -1, "", ErrEmpty
 	}
 
 	processor, ok := resp.Tuples()[0][1].(string)
 	if !ok {
-		return "", -1, "", errors.New("incorrect field")
+		return "", -1, "", ErrIncorrectType
 	}
 
 	index, ok := resp.Tuples()[0][2].(uint64)
 	if !ok {
-		return "0", -1, "", errors.New("incorrect field")
+		return "0", -1, "", ErrIncorrectType
 	}
 	quoteID, ok := resp.Tuples()[0][3].(string)
 	if !ok {
-		return "0", -1, "", errors.New("incorrect field")
+		return "0", -1, "", ErrIncorrectType
 	}
 
 	return processor, int(index), quoteID, nil
@@ -153,6 +152,7 @@ func TruncateSearch() error {
 	return truncateSpace(searchDB)
 }
 
+// SaveQuote func
 func SaveQuote(chatID int, quoteID string) error {
 	resp, err := db.Select(savedDB, primary, 0, 1, tarantool.IterEq, []interface{}{chatID})
 	if err != nil {
@@ -164,15 +164,27 @@ func SaveQuote(chatID int, quoteID string) error {
 		resp, err = db.Insert(savedDB, tuple)
 		return err
 	}
-	quotes, ok := resp.Tuples()[0][1].(map[string]bool)
+	quotesRaw, ok := resp.Tuples()[0][1].(map[interface{}]interface{})
 	if !ok {
-		return errors.New("incorrect field")
+		return ErrIncorrectType
+	}
+
+	quotes := make(map[string]bool)
+
+	for kr, vr := range quotesRaw {
+		k, okk := kr.(string)
+		v, okv := vr.(bool)
+		if !okk || !okv {
+			return ErrIncorrectType
+		}
+		quotes[k] = v
 	}
 	quotes[quoteID] = true
 	_, err = db.Update(savedDB, primary, []interface{}{chatID}, []interface{}{[]interface{}{"=", 1, quotes}})
 	return err
 }
 
+// GetSavedQuotes func
 func GetSavedQuotes(chatID int) (map[string]bool, error) {
 	resp, err := db.Select(savedDB, primary, 0, 1, tarantool.IterEq, []interface{}{chatID})
 	if err != nil {
@@ -180,16 +192,29 @@ func GetSavedQuotes(chatID int) (map[string]bool, error) {
 	}
 
 	if len(resp.Tuples()) == 0 {
-		return nil, errors.New("no fields")
+		return nil, ErrEmpty
 	}
 
-	quotes, ok := resp.Tuples()[0][1].(map[string]bool)
+	quotesRaw, ok := resp.Tuples()[0][1].(map[interface{}]interface{})
 	if !ok {
-		return nil, errors.New("incorrect field")
+		return nil, ErrIncorrectType
 	}
+
+	quotes := make(map[string]bool)
+
+	for kr, vr := range quotesRaw {
+		k, okk := kr.(string)
+		v, okv := vr.(bool)
+		if !okk || !okv {
+			return nil, ErrIncorrectType
+		}
+		quotes[k] = v
+	}
+
 	return quotes, nil
 }
 
+// DeleteSavedQuote func
 func DeleteSavedQuote(chatID int, quoteID string) error {
 	quotes, err := GetSavedQuotes(chatID)
 	if err != nil {
@@ -201,6 +226,7 @@ func DeleteSavedQuote(chatID int, quoteID string) error {
 	return err
 }
 
+// TruncateSaved func
 func TruncateSaved() error {
 	return truncateSpace(savedDB)
 }

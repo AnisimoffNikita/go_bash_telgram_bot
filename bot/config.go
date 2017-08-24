@@ -33,6 +33,16 @@ const (
 	Bayan  = "[ : ||| : ]"
 	Other  = "Еще одну"
 	Back   = "Назад"
+	Delete = "Удалить"
+)
+
+//Messages
+const (
+	WeHaveAnError = "У нас ошибочка:("
+	NothingToSend = "Пусто :("
+	BadThing      = "Что-то не то..."
+	SearchReq     = "Ищи!"
+	WhatSend      = "Что отправить?"
 )
 
 // WebhookConfig struct

@@ -2,6 +2,7 @@ package bash
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -52,6 +53,41 @@ func GetQuotes(topic string) ([]Quote, error) {
 	}
 
 	return getQuotesFromHTML(node)
+}
+
+// GetQuoteByID gets quote by id
+func GetQuoteByID(id string) (Quote, error) {
+	address := fmt.Sprintf("http://bash.im/quote/%s", id)
+
+	res, err := http.Get(address)
+	if err != nil {
+		return Quote{}, err
+	}
+	defer res.Body.Close()
+
+	utf8, err := charset.NewReader(res.Body, res.Header.Get("Content-Type"))
+	if err != nil {
+		return Quote{}, err
+	}
+
+	data, err := ioutil.ReadAll(utf8)
+	if err != nil {
+		return Quote{}, err
+	}
+
+	node, err := html.Parse(bytes.NewReader(data))
+	if err != nil {
+		return Quote{}, err
+	}
+
+	quotes, err := getQuotesFromHTML(node)
+	if err != nil {
+		return Quote{}, err
+	}
+	if len(quotes) == 0 {
+		return Quote{}, errors.New("no quote")
+	}
+	return quotes[0], nil
 }
 
 // QuoteToString convers Quote to String
