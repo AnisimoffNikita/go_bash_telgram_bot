@@ -27,9 +27,12 @@ type Bot struct {
 	Processors map[string]func(update *telegram.Update) error
 }
 
+// Processors name
 const (
-	def             = "default"
-	randomProcessor = "random"
+	DefaultProcessor     = "default"
+	RandomProcessor      = "random"
+	StartSearchProcessor = "startSearch"
+	SearchProcessor      = "search"
 )
 
 func newBot(token string, timeout time.Duration, poolSize int, debug bool) (*Bot, error) {
@@ -43,8 +46,10 @@ func newBot(token string, timeout time.Duration, poolSize int, debug bool) (*Bot
 	}
 
 	bot.Processors = map[string]func(update *telegram.Update) error{
-		def:             bot.processUpdate,
-		randomProcessor: bot.feedbackQuote,
+		DefaultProcessor:     bot.processUpdate,
+		RandomProcessor:      bot.feedbackQuote,
+		StartSearchProcessor: bot.startSearch,
+		SearchProcessor:      bot.feedbackSearch,
 	}
 
 	bot.Debug = debug
@@ -86,6 +91,10 @@ func StartBot(configPath string) error {
 
 	log.Println("connected...")
 
+	defer database.TruncateLastQuotes()
+	defer database.TruncateProcessor()
+	defer database.TruncateSearch()
+
 	if bot.Debug {
 		log.Println("start (debug)...")
 		return bot.processUpdatesChannel(config.PoolSize)
@@ -108,9 +117,6 @@ func StartBot(configPath string) error {
 	log.Println("webhook set...")
 	log.Println("start...")
 
-	defer database.TruncateLastQuotes()
-	defer database.TruncateProcessor()
-
 	http.HandleFunc("/"+bot.API.Token, bot.updateHandler)
 	return http.ListenAndServeTLS("0.0.0.0:"+config.Port,
 		config.Cert,
@@ -130,7 +136,7 @@ func (bot *Bot) processUpdatesChannel(channelSize int) error {
 				processor, err := database.GetProcessor(update.Message.Chat.ID)
 
 				if err != nil {
-					return bot.Processors[def](update)
+					return bot.Processors[DefaultProcessor](update)
 				}
 				return bot.Processors[processor](update)
 			}, bot.TimeOut)
@@ -189,7 +195,7 @@ func (bot *Bot) updateHandler(w http.ResponseWriter, r *http.Request) {
 
 		processor, err := database.GetProcessor(update.Message.Chat.ID)
 		if err != nil {
-			bot.Processors[def](&update)
+			return bot.Processors[DefaultProcessor](&update)
 		}
 		return bot.Processors[processor](&update)
 
@@ -228,7 +234,7 @@ func (bot *Bot) processUpdate(update *telegram.Update) error {
 	} else if text == Random {
 		return bot.sendRandom(id)
 	} else if text == Search {
-		//return bot.search(id)
+		return bot.sendSearch(id)
 	} else if text == Saved {
 		//return bot.saved()
 	}
@@ -238,6 +244,7 @@ func (bot *Bot) processUpdate(update *telegram.Update) error {
 func (bot *Bot) start(id int, greeting string) error {
 	database.TruncateLastQuotes()
 	database.TruncateProcessor()
+	database.SetProcessor(id, DefaultProcessor)
 
 	buttons := telegram.NewReplyKeyboardMarkup([][]string{
 		{Random},
@@ -270,7 +277,7 @@ func (bot *Bot) sendRandom(id int) error {
 		return err
 	}
 
-	database.SetProcessor(id, randomProcessor)
+	database.SetProcessor(id, RandomProcessor)
 
 	return err
 }
@@ -285,7 +292,8 @@ func (bot *Bot) feedbackQuote(update *telegram.Update) error {
 
 	lastQuote, err := database.GetLastQuote(id)
 	if err != nil {
-		return err
+		log.Printf("can't get quote: %e", err)
+		return bot.start(id, "У нас ошибка :(")
 	}
 
 	log.Println(lastQuote)
@@ -307,92 +315,81 @@ func (bot *Bot) feedbackQuote(update *telegram.Update) error {
 	return bot.start(id, "Фигню пишешь!")
 }
 
-//
-// func (bot *Bot) search(id int) error {
-//
-// 	bot.NextProcessor = bot.search2
-// 	_, err := bot.API.SendTextWithoutKeybord(id, "Введите, что хотите")
-// 	return err
-//
-// }
-//
-// func (bot *Bot) search2(update *telegram.Update) error {
-// 	bot.NextProcessor = nil
-//
-// 	if update.Message == nil {
-// 		return telegram.ErrAPINoMessage
-// 	}
-//
-// 	text := update.Message.Text
-// 	id := update.Message.Chat.ID
-// 	quotes, err := bash.Search(text)
-// 	if err != nil {
-// 		return err
-// 	}
-//
-// 	buttons := telegram.NewReplyKeyboardMarkup([][]string{
-// 		{Other},
-// 		{Plus, Minus, Bayan},
-// 		{Back},
-// 	})
-//
-// 	bot.LastQuote = quotes[rand.Intn(len(quotes))]
-// 	bot.NextProcessor = bot.feedbackSearch
-// 	bot.SearchRequest = text
-// 	bot.LastSearchIndex++
-//
-// 	_, err = bot.API.SendTextWithKeybord(id, bash.QuoteToString(bot.LastQuote), buttons)
-// 	return err
-// }
-//
-// func (bot *Bot) searchLast(id int) error {
-// 	quotes, err := bash.Search(bot.SearchRequest)
-// 	if err != nil {
-// 		return err
-// 	}
-//
-// 	buttons := telegram.NewReplyKeyboardMarkup([][]string{
-// 		{Other},
-// 		{Plus, Minus, Bayan},
-// 		{Back},
-// 	})
-//
-// 	if bot.LastSearchIndex < len(quotes) {
-// 		bot.LastQuote = quotes[bot.LastSearchIndex]
-// 		bot.NextProcessor = bot.feedbackSearch
-// 		bot.LastSearchIndex++
-//
-// 		_, err = bot.API.SendTextWithKeybord(id, bash.QuoteToString(bot.LastQuote), buttons)
-// 		return err
-// 	}
-// 	bot.LastSearchIndex = 0
-// 	bot.NextProcessor = nil
-// 	return bot.start(id, "Нет больше 8(")
-// }
-//
-// func (bot *Bot) feedbackSearch(update *telegram.Update) error {
-// 	bot.NextProcessor = nil
-//
-// 	if update.Message == nil {
-// 		return telegram.ErrAPINoMessage
-// 	}
-//
-// 	text := update.Message.Text
-// 	id := update.Message.Chat.ID
-//
-// 	if text == Other {
-// 		return bot.searchLast(id)
-// 	} else if text == Plus {
-// 		go bash.Plus(bot.LastQuote.ID)
-// 		return bot.searchLast(id)
-// 	} else if text == Minus {
-// 		go bash.Minus(bot.LastQuote.ID)
-// 		return bot.searchLast(id)
-// 	} else if text == Bayan {
-// 		go bash.Bayan(bot.LastQuote.ID)
-// 		return bot.searchLast(id)
-// 	} else if text == Back {
-// 		return bot.start(id, "Что отправить?")
-// 	}
-// 	return bot.start(id, "Фигню пишешь!")
-// }
+func (bot *Bot) sendSearch(id int) error {
+	database.SetProcessor(id, StartSearchProcessor)
+	_, err := bot.API.SendTextWithoutKeybord(id, "Введите, что хотите")
+	return err
+
+}
+
+func (bot *Bot) startSearch(update *telegram.Update) error {
+	if update.Message == nil {
+		return telegram.ErrAPINoMessage
+	}
+
+	text := update.Message.Text
+	id := update.Message.Chat.ID
+
+	database.SetSearch(id, text, 0, "")
+	database.SetProcessor(id, SearchProcessor)
+	return bot.sendFound(id, text, 0)
+}
+
+func (bot *Bot) feedbackSearch(update *telegram.Update) error {
+
+	if update.Message == nil {
+		return telegram.ErrAPINoMessage
+	}
+
+	id := update.Message.Chat.ID
+
+	req, index, quote, err := database.GetSearch(id)
+	if err != nil {
+		log.Printf("can't get search: %s", err)
+		return bot.start(id, "У на ошибка:(")
+	}
+
+	text := update.Message.Text
+
+	if text == Other {
+		return bot.sendFound(id, req, index)
+	} else if text == Plus {
+		go bash.Plus(quote)
+		return bot.sendFound(id, req, index)
+	} else if text == Minus {
+		go bash.Minus(quote)
+		return bot.sendFound(id, req, index)
+	} else if text == Bayan {
+		go bash.Bayan(quote)
+		return bot.sendFound(id, req, index)
+	} else if text == Back {
+		return bot.start(id, "Что отправить?")
+	}
+	return bot.start(id, "Фигню пишешь?")
+
+}
+
+func (bot *Bot) sendFound(id int, text string, index int) error {
+
+	quotes, err := bash.Search(text)
+	if err != nil {
+		return err
+	}
+
+	buttons := telegram.NewReplyKeyboardMarkup([][]string{
+		{Other},
+		{Plus, Minus, Bayan},
+		{Back},
+	})
+
+	if len(quotes) == 0 || len(quotes) <= index {
+		return bot.start(id, "Нет больше:(")
+	}
+
+	quote := quotes[index]
+
+	database.SetSearch(id, text, index+1, quote.ID)
+
+	_, err = bot.API.SendTextWithKeybord(id, bash.QuoteToString(quote), buttons)
+	return err
+}
