@@ -15,11 +15,6 @@ import (
 	"golang.org/x/text/transform"
 )
 
-// BashEndpoint
-const (
-	BashEndpoint = "http://bash.im/%s"
-)
-
 // Quote struct
 type Quote struct {
 	Text   string
@@ -29,7 +24,7 @@ type Quote struct {
 
 // GetQuotes comment... wtf
 func GetQuotes(topic string) ([]Quote, error) {
-	address := fmt.Sprintf(BashEndpoint, topic)
+	address := fmt.Sprintf("http://bash.im/%s", topic)
 
 	res, err := http.Get(address)
 	if err != nil {
@@ -144,7 +139,7 @@ func Bayan(id string) {
 
 // Search func searches on bash
 func Search(req string) ([]Quote, error) {
-
+	//url encode Windows1251
 	buf := new(bytes.Buffer)
 	wToWin1251 := transform.NewWriter(buf, charmap.Windows1251.NewEncoder())
 	io.Copy(wToWin1251, strings.NewReader(req))

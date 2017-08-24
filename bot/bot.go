@@ -22,6 +22,7 @@ import (
 type Bot struct {
 	API        telegram.BotAPI
 	Pool       *pool.Pool
+	DB         *database.Tarantool
 	TimeOut    time.Duration
 	Debug      bool
 	Processors map[string]func(update *telegram.Update) error
@@ -58,8 +59,8 @@ func newBot(token string, timeout time.Duration, poolSize int, debug bool) (*Bot
 
 	bot.Pool.Run()
 
-	database.TruncateLastQuotes()
-	database.TruncateProcessor()
+	bot.DB.TruncateLastQuotes()
+	bot.DB.TruncateProcessor()
 
 	self, err := bot.API.GetMe()
 	if err != nil {
@@ -85,9 +86,9 @@ func StartBot() error {
 
 	log.Println("connected...")
 
-	defer database.TruncateLastQuotes()
-	defer database.TruncateProcessor()
-	defer database.TruncateSearch()
+	defer bot.DB.TruncateLastQuotes()
+	defer bot.DB.TruncateProcessor()
+	defer bot.DB.TruncateSearch()
 
 	if bot.Debug {
 		log.Println("start (debug)...")
@@ -127,7 +128,7 @@ func (bot *Bot) processUpdatesChannel(channelSize int) error {
 	for update := range updates {
 		go func(update *telegram.Update) {
 			res, err := bot.Pool.AddTaskSyncTimed(func() interface{} {
-				processor, err := database.GetProcessor(update.Message.Chat.ID)
+				processor, err := bot.DB.GetProcessor(update.Message.Chat.ID)
 
 				if err != nil {
 					return bot.Processors[DefaultProcessor](update)
@@ -190,7 +191,7 @@ func (bot *Bot) updateHandler(w http.ResponseWriter, r *http.Request) {
 			return err
 		}
 
-		processor, err := database.GetProcessor(update.Message.Chat.ID)
+		processor, err := bot.DB.GetProcessor(update.Message.Chat.ID)
 		if err != nil {
 			return bot.Processors[DefaultProcessor](&update)
 		}
@@ -242,9 +243,9 @@ func (bot *Bot) processUpdate(update *telegram.Update) error {
 }
 
 func (bot *Bot) start(id int, greeting string) error {
-	database.TruncateLastQuotes()
-	database.TruncateProcessor()
-	database.SetProcessor(id, DefaultProcessor)
+	bot.DB.TruncateLastQuotes()
+	bot.DB.TruncateProcessor()
+	bot.DB.SetProcessor(id, DefaultProcessor)
 
 	buttons := telegram.NewReplyKeyboardMarkup([][]string{
 		{Random},
@@ -278,11 +279,11 @@ func (bot *Bot) sendRandom(id int) error {
 		return fmt.Errorf("can't send message %s", err)
 	}
 
-	err = database.SetProcessor(id, RandomProcessor)
+	err = bot.DB.SetProcessor(id, RandomProcessor)
 	if err != nil {
 		return fmt.Errorf("can't set processor %s", err)
 	}
-	err = database.SetLastQuote(id, quote.ID)
+	err = bot.DB.SetLastQuote(id, quote.ID)
 	if err != nil {
 		return fmt.Errorf("can't set quote%s", err)
 	}
@@ -298,7 +299,7 @@ func (bot *Bot) feedbackQuote(update *telegram.Update) error {
 	text := update.Message.Text
 	id := update.Message.Chat.ID
 
-	lastQuote, err := database.GetLastQuote(id)
+	lastQuote, err := bot.DB.GetLastQuote(id)
 	if err != nil {
 		return fmt.Errorf("can't get quote: %s", err)
 	}
@@ -307,7 +308,7 @@ func (bot *Bot) feedbackQuote(update *telegram.Update) error {
 		return bot.sendRandom(id)
 	} else if text == Plus {
 		go func() {
-			err := database.SaveQuote(id, lastQuote)
+			err := bot.DB.SaveQuote(id, lastQuote)
 			if err != nil {
 				log.Printf("can't save quote: %s", err)
 			}
@@ -327,7 +328,7 @@ func (bot *Bot) feedbackQuote(update *telegram.Update) error {
 }
 
 func (bot *Bot) sendSearch(id int) error {
-	err := database.SetProcessor(id, StartSearchProcessor)
+	err := bot.DB.SetProcessor(id, StartSearchProcessor)
 	if err != nil {
 		return fmt.Errorf("can't set processor %s", err)
 	}
@@ -347,11 +348,11 @@ func (bot *Bot) startSearch(update *telegram.Update) error {
 	text := update.Message.Text
 	id := update.Message.Chat.ID
 
-	err := database.SetSearch(id, text, 0, "")
+	err := bot.DB.SetSearch(id, text, 0, "")
 	if err != nil {
 		return fmt.Errorf("can't set search %s", err)
 	}
-	err = database.SetProcessor(id, SearchProcessor)
+	err = bot.DB.SetProcessor(id, SearchProcessor)
 	if err != nil {
 		return fmt.Errorf("can't set processor%s", err)
 	}
@@ -366,7 +367,7 @@ func (bot *Bot) feedbackSearch(update *telegram.Update) error {
 
 	id := update.Message.Chat.ID
 
-	req, index, quote, err := database.GetSearch(id)
+	req, index, quote, err := bot.DB.GetSearch(id)
 	if err != nil {
 		return fmt.Errorf("can't get search: %s", err)
 	}
@@ -414,7 +415,7 @@ func (bot *Bot) sendFound(id int, text string, index int) error {
 		return fmt.Errorf("can't send message %s", err)
 	}
 
-	err = database.SetSearch(id, text, index+1, quote.ID)
+	err = bot.DB.SetSearch(id, text, index+1, quote.ID)
 	if err != nil {
 		return fmt.Errorf("can't set quote%s", err)
 	}
@@ -422,7 +423,7 @@ func (bot *Bot) sendFound(id int, text string, index int) error {
 }
 
 func (bot *Bot) sendSaved(id int) error {
-	quotes, err := database.GetSavedQuotes(id)
+	quotes, err := bot.DB.GetSavedQuotes(id)
 	if err == database.ErrEmpty {
 		return bot.start(id, NothingToSend)
 	}
@@ -462,12 +463,12 @@ func (bot *Bot) sendSaved(id int) error {
 		return fmt.Errorf("can't send message: %s", err)
 	}
 
-	err = database.SetLastQuote(id, quote.ID)
+	err = bot.DB.SetLastQuote(id, quote.ID)
 	if err != nil {
 		return fmt.Errorf("can't set quote: %s", err)
 	}
 
-	err = database.SetProcessor(id, SaveProcessor)
+	err = bot.DB.SetProcessor(id, SaveProcessor)
 	if err != nil {
 		return fmt.Errorf("can't set processor: %s", err)
 	}
@@ -483,7 +484,7 @@ func (bot *Bot) feedbackSaved(update *telegram.Update) error {
 	text := update.Message.Text
 	id := update.Message.Chat.ID
 
-	lastQuote, err := database.GetLastQuote(id)
+	lastQuote, err := bot.DB.GetLastQuote(id)
 	if err != nil {
 		return fmt.Errorf("feedbackSaved error: %s", err)
 	}
@@ -492,7 +493,7 @@ func (bot *Bot) feedbackSaved(update *telegram.Update) error {
 		return bot.sendSaved(id)
 	} else if text == Delete {
 
-		err := database.DeleteSavedQuote(id, lastQuote)
+		err := bot.DB.DeleteSavedQuote(id, lastQuote)
 		if err != nil {
 			return fmt.Errorf("can't save quote: %s", err)
 		}

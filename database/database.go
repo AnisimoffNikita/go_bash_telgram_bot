@@ -10,7 +10,10 @@ import (
 	"github.com/AnisimoffNikita/go_bash_telgram_bot/helper"
 )
 
-var db *tarantool.Connection
+// Tarantool connection type
+type Tarantool struct {
+	connection *tarantool.Connection
+}
 
 const (
 	processorsDB = "tg_bot_processor"
@@ -21,7 +24,8 @@ const (
 	primary = "primary"
 )
 
-func init() {
+// NewDB creates new tarantool connection
+func (db *Tarantool) NewDB() {
 
 	var config Config
 	err := helper.GetYamlConfig(ConfigPath, &config)
@@ -37,60 +41,60 @@ func init() {
 		Pass:          config.Pass,
 	}
 
-	db, err = tarantool.Connect(fmt.Sprintf("%s:%s", config.Host, config.Port), opts)
+	db.connection, err = tarantool.Connect(fmt.Sprintf("%s:%s", config.Host, config.Port), opts)
 
 	if err != nil {
 		log.Fatalf("Can't connect to tarantool: %s", err)
 	}
 }
 
-// SetLastQuote func
-func SetLastQuote(chatID int, quoteID string) error {
-	return setString(quoteDB, chatID, quoteID)
+// SetLastQuote func  (db *Tarantool)
+func (db *Tarantool) SetLastQuote(chatID int, quoteID string) error {
+	return db.setString(quoteDB, chatID, quoteID)
 }
 
-// GetLastQuote func
-func GetLastQuote(chatID int) (string, error) {
-	return getString(quoteDB, chatID)
+// GetLastQuote func  (db *Tarantool)
+func (db *Tarantool) GetLastQuote(chatID int) (string, error) {
+	return db.getString(quoteDB, chatID)
 }
 
-// RemoveLastQuote func
-func RemoveLastQuote(chatID int) error {
-	return deleteSpace(quoteDB, chatID)
+// RemoveLastQuote func  (db *Tarantool)
+func (db *Tarantool) RemoveLastQuote(chatID int) error {
+	return db.deleteSpace(quoteDB, chatID)
 }
 
-// TruncateLastQuotes func
-func TruncateLastQuotes() error {
-	return truncateSpace(quoteDB)
+// TruncateLastQuotes func  (db *Tarantool)
+func (db *Tarantool) TruncateLastQuotes() error {
+	return db.truncateSpace(quoteDB)
 }
 
-// SetProcessor func
-func SetProcessor(chatID int, processor string) error {
-	return setString(processorsDB, chatID, processor)
+// SetProcessor func  (db *Tarantool)
+func (db *Tarantool) SetProcessor(chatID int, processor string) error {
+	return db.setString(processorsDB, chatID, processor)
 }
 
-// GetProcessor func
-func GetProcessor(chatID int) (string, error) {
-	return getString(processorsDB, chatID)
+// GetProcessor func  (db *Tarantool)
+func (db *Tarantool) GetProcessor(chatID int) (string, error) {
+	return db.getString(processorsDB, chatID)
 }
 
-// RemoveProcessor func
-func RemoveProcessor(chatID int) error {
-	return deleteSpace(processorsDB, chatID)
+// RemoveProcessor func  (db *Tarantool)
+func (db *Tarantool) RemoveProcessor(chatID int) error {
+	return db.deleteSpace(processorsDB, chatID)
 }
 
-// TruncateProcessor func
-func TruncateProcessor() error {
-	return truncateSpace(processorsDB)
+// TruncateProcessor func  (db *Tarantool)
+func (db *Tarantool) TruncateProcessor() error {
+	return db.truncateSpace(processorsDB)
 }
 
-func setString(name string, id int, str string) error {
-	_, err := db.Upsert(name, []interface{}{id, str}, []interface{}{[]interface{}{"=", 1, str}})
+func (db *Tarantool) setString(name string, id int, str string) error {
+	_, err := db.connection.Upsert(name, []interface{}{id, str}, []interface{}{[]interface{}{"=", 1, str}})
 	return err
 }
 
-func getString(name string, id int) (string, error) {
-	resp, err := db.Select(name, primary, 0, 1, tarantool.IterEq, []interface{}{id})
+func (db *Tarantool) getString(name string, id int) (string, error) {
+	resp, err := db.connection.Select(name, primary, 0, 1, tarantool.IterEq, []interface{}{id})
 	if err != nil {
 		return "", err
 	}
@@ -106,20 +110,20 @@ func getString(name string, id int) (string, error) {
 	return processor, nil
 }
 
-func deleteSpace(name string, id int) error {
-	_, err := db.Delete(name, primary, []interface{}{id})
+func (db *Tarantool) deleteSpace(name string, id int) error {
+	_, err := db.connection.Delete(name, primary, []interface{}{id})
 	return err
 }
 
-func truncateSpace(name string) error {
+func (db *Tarantool) truncateSpace(name string) error {
 	rawQuery := fmt.Sprintf("box.space.%s:truncate()", name)
-	_, err := db.Eval(rawQuery, []interface{}{})
+	_, err := db.connection.Eval(rawQuery, []interface{}{})
 	return err
 }
 
-// SetSearch func
-func SetSearch(chatID int, req string, index int, quoteID string) error {
-	_, err := db.Upsert(searchDB, []interface{}{chatID, req, index, quoteID},
+// SetSearch func  (db *Tarantool)
+func (db *Tarantool) SetSearch(chatID int, req string, index int, quoteID string) error {
+	_, err := db.connection.Upsert(searchDB, []interface{}{chatID, req, index, quoteID},
 		[]interface{}{
 			[]interface{}{"=", 1, req},
 			[]interface{}{"=", 2, index},
@@ -127,9 +131,9 @@ func SetSearch(chatID int, req string, index int, quoteID string) error {
 	return err
 }
 
-// GetSearch func
-func GetSearch(chatID int) (string, int, string, error) {
-	resp, err := db.Select(searchDB, primary, 0, 1, tarantool.IterEq, []interface{}{chatID})
+// GetSearch func  (db *Tarantool)
+func (db *Tarantool) GetSearch(chatID int) (string, int, string, error) {
+	resp, err := db.connection.Select(searchDB, primary, 0, 1, tarantool.IterEq, []interface{}{chatID})
 	if err != nil {
 		return "", -1, "", err
 	}
@@ -155,21 +159,21 @@ func GetSearch(chatID int) (string, int, string, error) {
 	return processor, int(index), quoteID, nil
 }
 
-// TruncateSearch func
-func TruncateSearch() error {
-	return truncateSpace(searchDB)
+// TruncateSearch func  (db *Tarantool)
+func (db *Tarantool) TruncateSearch() error {
+	return db.truncateSpace(searchDB)
 }
 
-// SaveQuote func
-func SaveQuote(chatID int, quoteID string) error {
-	resp, err := db.Select(savedDB, primary, 0, 1, tarantool.IterEq, []interface{}{chatID})
+// SaveQuote func  (db *Tarantool)
+func (db *Tarantool) SaveQuote(chatID int, quoteID string) error {
+	resp, err := db.connection.Select(savedDB, primary, 0, 1, tarantool.IterEq, []interface{}{chatID})
 	if err != nil {
 		return err
 	}
 
 	if len(resp.Tuples()) == 0 {
 		tuple := []interface{}{chatID, map[string]bool{quoteID: true}}
-		resp, err = db.Insert(savedDB, tuple)
+		resp, err = db.connection.Insert(savedDB, tuple)
 		return err
 	}
 	quotesRaw, ok := resp.Tuples()[0][1].(map[interface{}]interface{})
@@ -188,13 +192,13 @@ func SaveQuote(chatID int, quoteID string) error {
 		quotes[k] = v
 	}
 	quotes[quoteID] = true
-	_, err = db.Update(savedDB, primary, []interface{}{chatID}, []interface{}{[]interface{}{"=", 1, quotes}})
+	_, err = db.connection.Update(savedDB, primary, []interface{}{chatID}, []interface{}{[]interface{}{"=", 1, quotes}})
 	return err
 }
 
-// GetSavedQuotes func
-func GetSavedQuotes(chatID int) (map[string]bool, error) {
-	resp, err := db.Select(savedDB, primary, 0, 1, tarantool.IterEq, []interface{}{chatID})
+// GetSavedQuotes func  (db *Tarantool)
+func (db *Tarantool) GetSavedQuotes(chatID int) (map[string]bool, error) {
+	resp, err := db.connection.Select(savedDB, primary, 0, 1, tarantool.IterEq, []interface{}{chatID})
 	if err != nil {
 		return nil, err
 	}
@@ -222,19 +226,19 @@ func GetSavedQuotes(chatID int) (map[string]bool, error) {
 	return quotes, nil
 }
 
-// DeleteSavedQuote func
-func DeleteSavedQuote(chatID int, quoteID string) error {
-	quotes, err := GetSavedQuotes(chatID)
+// DeleteSavedQuote func  (db *Tarantool)
+func (db *Tarantool) DeleteSavedQuote(chatID int, quoteID string) error {
+	quotes, err := db.GetSavedQuotes(chatID)
 	if err != nil {
 		return err
 	}
 
 	delete(quotes, quoteID)
-	_, err = db.Update(savedDB, primary, []interface{}{chatID}, []interface{}{[]interface{}{"=", 1, quotes}})
+	_, err = db.connection.Update(savedDB, primary, []interface{}{chatID}, []interface{}{[]interface{}{"=", 1, quotes}})
 	return err
 }
 
-// TruncateSaved func
-func TruncateSaved() error {
-	return truncateSpace(savedDB)
+// TruncateSaved func  (db *Tarantool)
+func (db *Tarantool) TruncateSaved() error {
+	return db.truncateSpace(savedDB)
 }
