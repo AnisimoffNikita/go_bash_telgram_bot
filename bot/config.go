@@ -6,7 +6,7 @@ import (
 )
 
 const (
-	configPath = "config.yaml"
+	configPath = "config.yml"
 )
 
 // Config of bot

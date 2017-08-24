@@ -12,7 +12,7 @@ var (
 
 // Path to db config
 const (
-	ConfigPath = "db.yaml"
+	ConfigPath = "db.yml"
 )
 
 // Config of db
