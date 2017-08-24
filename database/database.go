@@ -35,7 +35,7 @@ func NewTarantool() (*Tarantool, error) {
 	opts := tarantool.Opts{
 		Timeout:       time.Duration(config.Timeout) * time.Second,
 		Reconnect:     time.Duration(config.Reconnect) * time.Second,
-		MaxReconnects: 5,
+		MaxReconnects: config.MaxReconnects,
 		User:          config.User,
 		Pass:          config.Pass,
 	}
@@ -45,6 +45,25 @@ func NewTarantool() (*Tarantool, error) {
 	if err != nil {
 		return nil, fmt.Errorf("cannot connect to tarantool: %s", err)
 	}
+
+	rawQueryCreateSpace := "box.schema.space.create('%s')"
+	rawQueryCreateIndex := "box.space.%s:create_index('%s', {type = 'hash',parts = {1, 'unsigned'}})"
+	dbs := []string{processorsDB, savedDB, quoteDB, searchDB}
+
+	for _, db := range dbs {
+		space := connection.Schema.Spaces[db]
+		if space == nil {
+			_, err := connection.Eval(fmt.Sprintf(rawQueryCreateSpace, db), []interface{}{})
+			if err != nil {
+				return nil, fmt.Errorf("cannot create space %s: %s", db, err)
+			}
+			_, err = connection.Eval(fmt.Sprintf(rawQueryCreateIndex, db, primary), []interface{}{})
+			if err != nil {
+				return nil, fmt.Errorf("cannot create index on %s: %s", db, err)
+			}
+		}
+	}
+
 	return &Tarantool{connection: connection}, nil
 }
 

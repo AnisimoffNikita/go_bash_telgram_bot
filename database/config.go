@@ -23,5 +23,5 @@ type Config struct {
 	Pass          string `yaml:"pass"`
 	Timeout       int    `yaml:"timeout"`
 	Reconnect     int    `yaml:"reconnect"`
-	MaxReconnects int    `yaml:"max_reconnects"`
+	MaxReconnects uint   `yaml:"max_reconnects"`
 }
