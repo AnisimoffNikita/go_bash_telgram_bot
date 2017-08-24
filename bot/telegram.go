@@ -236,7 +236,7 @@ func (bot *Bot) processUpdate(update *telegram.Update) error {
 	} else if text == Search {
 		return bot.sendSearch(id)
 	} else if text == Saved {
-		//return bot.saved()
+		return bot.sendSaved()
 	}
 	return bot.start(id, "Ошибочка, давай заново!")
 }

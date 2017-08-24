@@ -12,8 +12,8 @@ import (
 var db *tarantool.Connection
 
 const (
-	savedDB      = "tg_bot_saved"
 	processorsDB = "tg_bot_processor"
+	savedDB      = "tg_bot_saved"
 	quoteDB      = "tg_bot_quotes"
 	searchDB     = "tg_bot_search"
 
@@ -151,4 +151,56 @@ func GetSearch(chatID int) (string, int, string, error) {
 // TruncateSearch func
 func TruncateSearch() error {
 	return truncateSpace(searchDB)
+}
+
+func SaveQuote(chatID int, quoteID string) error {
+	resp, err := db.Select(savedDB, primary, 0, 1, tarantool.IterEq, []interface{}{chatID})
+	if err != nil {
+		return err
+	}
+
+	if len(resp.Tuples()) == 0 {
+		tuple := []interface{}{chatID, map[string]bool{quoteID: true}}
+		resp, err = db.Insert(savedDB, tuple)
+		return err
+	}
+	quotes, ok := resp.Tuples()[0][1].(map[string]bool)
+	if !ok {
+		return errors.New("incorrect field")
+	}
+	quotes[quoteID] = true
+	_, err = db.Update(savedDB, primary, []interface{}{chatID}, []interface{}{[]interface{}{"=", 1, quotes}})
+	return err
+}
+
+func GetSavedQuotes(chatID int) (map[string]bool, error) {
+	resp, err := db.Select(savedDB, primary, 0, 1, tarantool.IterEq, []interface{}{chatID})
+	if err != nil {
+		return nil, err
+	}
+
+	if len(resp.Tuples()) == 0 {
+		return nil, errors.New("no fields")
+	}
+
+	quotes, ok := resp.Tuples()[0][1].(map[string]bool)
+	if !ok {
+		return nil, errors.New("incorrect field")
+	}
+	return quotes, nil
+}
+
+func DeleteSavedQuote(chatID int, quoteID string) error {
+	quotes, err := GetSavedQuotes(chatID)
+	if err != nil {
+		return err
+	}
+
+	delete(quotes, quoteID)
+	_, err = db.Update(savedDB, primary, []interface{}{chatID}, []interface{}{[]interface{}{"=", 1, quotes}})
+	return err
+}
+
+func TruncateSaved() error {
+	return truncateSpace(savedDB)
 }
