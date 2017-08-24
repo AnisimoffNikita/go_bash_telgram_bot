@@ -28,23 +28,23 @@ func GetQuotes(topic string) ([]Quote, error) {
 
 	res, err := http.Get(address)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("can't get page: %s", err)
 	}
 	defer res.Body.Close()
 
 	utf8, err := charset.NewReader(res.Body, res.Header.Get("Content-Type"))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("GetQuotes: %s", err)
 	}
 
 	data, err := ioutil.ReadAll(utf8)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("GetQuotes: %s", err)
 	}
 
 	node, err := html.Parse(bytes.NewReader(data))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("GetQuotes: %s", err)
 	}
 
 	return getQuotesFromHTML(node)
@@ -183,10 +183,22 @@ func getQuotesFromHTML(node *html.Node) ([]Quote, error) {
 	quotes := make([]Quote, len(quoteNodes))
 
 	for i, q := range quoteNodes {
-		idNode := getElementByClass(q, "id")[0]
-		ratingNode := getElementByClass(q, "rating")[0] // there is only one class
-		textNode := getElementByClass(q, "text")[0]     // there is only one class
-		quotes[i].ID = idNode.FirstChild.Data[1:]       // # char skip
+		idClass := getElementByClass(q, "id")
+		if len(idClass) == 0 {
+			continue
+		}
+		idNode := idClass[0]
+		ratingClass := getElementByClass(q, "rating")
+		if len(ratingClass) == 0 {
+			continue
+		}
+		ratingNode := ratingClass[0]
+		textClass := getElementByClass(q, "text")
+		if len(textClass) == 0 {
+			continue
+		}
+		textNode := textClass[0]
+		quotes[i].ID = idNode.FirstChild.Data[1:]
 		quotes[i].Rating = ratingNode.FirstChild.Data
 		quotes[i].Text = ""
 		for c := textNode.FirstChild; c != nil; c = c.NextSibling {

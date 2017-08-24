@@ -18,7 +18,6 @@ type Config struct {
 	Port     string        `yaml:"port"`
 	PoolSize int           `yaml:"pool_size"`
 	TimeOut  time.Duration `yaml:"timeout"`
-	Debug    bool          `yaml:"debug"`
 }
 
 // Menu constants

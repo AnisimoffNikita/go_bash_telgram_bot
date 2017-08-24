@@ -24,7 +24,6 @@ type Bot struct {
 	Pool       *pool.Pool
 	DB         *database.Tarantool
 	TimeOut    time.Duration
-	Debug      bool
 	Processors map[string]func(update *telegram.Update) error
 }
 
@@ -37,7 +36,7 @@ const (
 	SearchProcessor      = "search"
 )
 
-func newBot(token string, timeout time.Duration, poolSize int, debug bool) (*Bot, error) {
+func newBot(token string, timeout time.Duration, poolSize int) (*Bot, error) {
 	bot := &Bot{
 		API: telegram.BotAPI{
 			Token:  token,
@@ -55,7 +54,12 @@ func newBot(token string, timeout time.Duration, poolSize int, debug bool) (*Bot
 		SaveProcessor:        bot.feedbackSaved,
 	}
 
-	bot.Debug = debug
+	var err error
+	bot.DB, err = database.NewTarantool()
+
+	if err != nil {
+		return nil, err
+	}
 
 	bot.Pool.Run()
 
@@ -79,7 +83,7 @@ func StartBot() error {
 		log.Fatal(err)
 	}
 
-	bot, err := newBot(config.Token, config.TimeOut, config.PoolSize, config.Debug)
+	bot, err := newBot(config.Token, config.TimeOut, config.PoolSize)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -90,7 +94,7 @@ func StartBot() error {
 	defer bot.DB.TruncateProcessor()
 	defer bot.DB.TruncateSearch()
 
-	if bot.Debug {
+	if config.PKey == "" {
 		log.Println("start (debug)...")
 		return bot.processUpdatesChannel(config.PoolSize)
 	}

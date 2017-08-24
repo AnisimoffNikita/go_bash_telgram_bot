@@ -2,7 +2,6 @@ package database
 
 import (
 	"fmt"
-	"log"
 	"time"
 
 	tarantool "github.com/tarantool/go-tarantool"
@@ -24,13 +23,13 @@ const (
 	primary = "primary"
 )
 
-// NewDB creates new tarantool connection
-func (db *Tarantool) NewDB() {
+// NewTarantool creates new tarantool connection
+func NewTarantool() (*Tarantool, error) {
 
 	var config Config
 	err := helper.GetYamlConfig(ConfigPath, &config)
 	if err != nil {
-		log.Fatal(err)
+		return nil, fmt.Errorf("no tarantool config: %s", err)
 	}
 
 	opts := tarantool.Opts{
@@ -41,11 +40,12 @@ func (db *Tarantool) NewDB() {
 		Pass:          config.Pass,
 	}
 
-	db.connection, err = tarantool.Connect(fmt.Sprintf("%s:%s", config.Host, config.Port), opts)
+	connection, err := tarantool.Connect(fmt.Sprintf("%s:%s", config.Host, config.Port), opts)
 
 	if err != nil {
-		log.Fatalf("Can't connect to tarantool: %s", err)
+		return nil, fmt.Errorf("cannot connect to tarantool: %s", err)
 	}
+	return &Tarantool{connection: connection}, nil
 }
 
 // SetLastQuote func  (db *Tarantool)
@@ -103,6 +103,10 @@ func (db *Tarantool) getString(name string, id int) (string, error) {
 		return "", ErrEmpty
 	}
 
+	if len(resp.Tuples()[0]) < 2 {
+		return "", ErrEmpty
+	}
+
 	processor, ok := resp.Tuples()[0][1].(string)
 	if !ok {
 		return "0", ErrIncorrectType
@@ -142,6 +146,10 @@ func (db *Tarantool) GetSearch(chatID int) (string, int, string, error) {
 		return "", -1, "", ErrEmpty
 	}
 
+	if len(resp.Tuples()[0]) < 4 {
+		return "", -1, "", ErrEmpty
+	}
+
 	processor, ok := resp.Tuples()[0][1].(string)
 	if !ok {
 		return "", -1, "", ErrIncorrectType
@@ -171,11 +179,12 @@ func (db *Tarantool) SaveQuote(chatID int, quoteID string) error {
 		return err
 	}
 
-	if len(resp.Tuples()) == 0 {
+	if len(resp.Tuples()) == 0 || len(resp.Tuples()[0]) < 2 {
 		tuple := []interface{}{chatID, map[string]bool{quoteID: true}}
 		resp, err = db.connection.Insert(savedDB, tuple)
 		return err
 	}
+
 	quotesRaw, ok := resp.Tuples()[0][1].(map[interface{}]interface{})
 	if !ok {
 		return ErrIncorrectType
@@ -204,6 +213,10 @@ func (db *Tarantool) GetSavedQuotes(chatID int) (map[string]bool, error) {
 	}
 
 	if len(resp.Tuples()) == 0 {
+		return nil, ErrEmpty
+	}
+
+	if len(resp.Tuples()[0]) < 2 {
 		return nil, ErrEmpty
 	}
 
