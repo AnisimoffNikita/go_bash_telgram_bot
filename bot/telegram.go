@@ -331,7 +331,7 @@ func (bot *Bot) sendSearch(id int) error {
 	if err != nil {
 		return fmt.Errorf("can't set processor %s", err)
 	}
-	_, err := bot.API.SendTextWithoutKeybord(id, SearchReq)
+	_, err = bot.API.SendTextWithoutKeybord(id, SearchReq)
 	if err != nil {
 		return fmt.Errorf("can't send message %s", err)
 	}
