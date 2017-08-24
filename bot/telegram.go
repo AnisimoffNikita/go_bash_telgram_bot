@@ -300,7 +300,7 @@ func (bot *Bot) feedbackQuote(update *telegram.Update) error {
 
 	lastQuote, err := database.GetLastQuote(id)
 	if err != nil {
-		return fmt.Errorf("can't get quote: %e", err)
+		return fmt.Errorf("can't get quote: %s", err)
 	}
 
 	if text == Other {
@@ -309,7 +309,7 @@ func (bot *Bot) feedbackQuote(update *telegram.Update) error {
 		go func() {
 			err := database.SaveQuote(id, lastQuote)
 			if err != nil {
-				log.Printf("can't save quote: %e", err)
+				log.Printf("can't save quote: %s", err)
 			}
 		}()
 		go bash.Plus(lastQuote)
