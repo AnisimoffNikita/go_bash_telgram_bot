@@ -1,6 +1,8 @@
 Bash Telegram Bot
 =================
 
+Bot can send random quotes from the bashorg. User can like or dislike quotes. Liked quotes will be saved. The user will be able to see them and delete them, if he wants.
+
 # Run
     go run main.go
 
@@ -29,6 +31,3 @@ Database configuration must have name db.yml.
       timeout:       1
       reconnect:     1
       max_reconnects: 5
-
-# Usage
-Bot can send random quotes from the bashorg. User can like or dislike quotes. Liked quotes will be saved. The user will be able to see them and delete them, if he wants.
