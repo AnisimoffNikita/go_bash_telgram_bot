@@ -1,8 +1,14 @@
 package pool
 
 import (
+	"errors"
 	"sync"
 	"time"
+)
+
+//Pool errors
+var (
+	ErrJobTimedOut = errors.New("job request timed out")
 )
 
 // Func ...
