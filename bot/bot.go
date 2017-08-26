@@ -306,10 +306,10 @@ func (bot *Bot) feedbackQuote(update *telegram.Update) error {
 	if err != nil {
 		return fmt.Errorf("can't get quote: %s", err)
 	}
-
-	if text == Other {
+	switch text {
+	case Other:
 		return bot.sendRandom(id)
-	} else if text == Plus {
+	case Plus:
 		go func() {
 			err := bot.DB.SaveQuote(id, lastQuote)
 			if err != nil {
@@ -318,16 +318,17 @@ func (bot *Bot) feedbackQuote(update *telegram.Update) error {
 		}()
 		go bash.Plus(lastQuote)
 		return bot.sendRandom(id)
-	} else if text == Minus {
+	case Minus:
 		go bash.Minus(lastQuote)
 		return bot.sendRandom(id)
-	} else if text == Bayan {
+	case Bayan:
 		go bash.Bayan(lastQuote)
 		return bot.sendRandom(id)
-	} else if text == Back {
+	case Back:
 		return bot.start(id, WhatSend)
+	default:
+		return bot.start(id, BadThing)
 	}
-	return bot.start(id, BadThing)
 }
 
 func (bot *Bot) sendSearch(id int) error {
@@ -377,22 +378,23 @@ func (bot *Bot) feedbackSearch(update *telegram.Update) error {
 
 	text := update.Message.Text
 
-	if text == Other {
+	switch text {
+	case Other:
 		return bot.sendFound(id, req, index)
-	} else if text == Plus {
+	case Plus:
 		go bash.Plus(quote)
 		return bot.sendFound(id, req, index)
-	} else if text == Minus {
+	case Minus:
 		go bash.Minus(quote)
 		return bot.sendFound(id, req, index)
-	} else if text == Bayan {
+	case Bayan:
 		go bash.Bayan(quote)
 		return bot.sendFound(id, req, index)
-	} else if text == Back {
+	case Back:
 		return bot.start(id, WhatSend)
+	default:
+		return bot.start(id, BadThing)
 	}
-	return bot.start(id, BadThing)
-
 }
 
 func (bot *Bot) sendFound(id int, text string, index int) error {
@@ -492,17 +494,18 @@ func (bot *Bot) feedbackSaved(update *telegram.Update) error {
 		return fmt.Errorf("feedbackSaved error: %s", err)
 	}
 
-	if text == Other {
+	switch text {
+	case Other:
 		return bot.sendSaved(id)
-	} else if text == Delete {
-
+	case Delete:
 		err := bot.DB.DeleteSavedQuote(id, lastQuote)
 		if err != nil {
 			return fmt.Errorf("can't save quote: %s", err)
 		}
 		return bot.sendSaved(id)
-	} else if text == Back {
+	case Back:
 		return bot.start(id, WhatSend)
+	default:
+		return bot.start(id, BadThing)
 	}
-	return bot.start(id, BadThing)
 }
