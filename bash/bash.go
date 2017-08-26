@@ -98,36 +98,23 @@ func QuoteToString(quote Quote) string {
 
 // Plus request
 func Plus(id string) {
-	address := fmt.Sprintf("http://bash.im/quote/%s/rulez", id)
-	data := fmt.Sprintf("quote=%s&act=rulez", id)
-
-	client := &http.Client{}
-	req, _ := http.NewRequest("POST", address, strings.NewReader(data))
-	req.Header.Add("Referer", "http://bash.im/")
-
-	resp, _ := client.Do(req)
-
-	defer resp.Body.Close()
+	feedback(id, "rulez")
 }
 
 // Minus request
 func Minus(id string) {
-	address := fmt.Sprintf("http://bash.im/quote/%s/sux", id)
-
-	data := fmt.Sprintf("quote=%s&act=sux", id)
-
-	client := &http.Client{}
-	req, _ := http.NewRequest("POST", address, strings.NewReader(data))
-	req.Header.Add("Referer", "http://bash.im/")
-	resp, _ := client.Do(req)
-	defer resp.Body.Close()
+	feedback(id, "sux")
 }
 
 // Bayan request
 func Bayan(id string) {
-	address := fmt.Sprintf("http://bash.im/quote/%s/bayan", id)
+	feedback(id, "bayan")
+}
 
-	data := fmt.Sprintf("quote=%s&act=bayan", id)
+func feedback(id string, act string) {
+	address := fmt.Sprintf("http://bash.im/quote/%s/%s", id, act)
+
+	data := fmt.Sprintf("quote=%s&act=%s", id, act)
 
 	client := &http.Client{}
 	req, _ := http.NewRequest("POST", address, strings.NewReader(data))

@@ -95,7 +95,7 @@ func StartBot() error {
 	defer bot.DB.TruncateSearch()
 
 	if config.PKey == "" {
-		log.Println("start (debug)...")
+		log.Println("start...")
 		return bot.processUpdatesChannel(config.PoolSize)
 	}
 
@@ -113,7 +113,6 @@ func StartBot() error {
 		log.Fatal(err)
 	}
 
-	log.Println("webhook set...")
 	log.Println("start...")
 
 	http.HandleFunc("/"+bot.API.Token, bot.updateHandler)
@@ -503,7 +502,7 @@ func (bot *Bot) feedbackSaved(update *telegram.Update) error {
 		}
 		return bot.sendSaved(id)
 	} else if text == Back {
-		return bot.start(id, NothingToSend)
+		return bot.start(id, WhatSend)
 	}
 	return bot.start(id, BadThing)
 }
