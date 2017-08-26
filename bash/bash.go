@@ -127,20 +127,16 @@ func feedback(id string, act string) {
 // Search func searches on bash
 func Search(req string) ([]Quote, error) {
 	//url encode Windows1251
+	address := fmt.Sprintf("http://bash.im/index?text=%s", req)
+
 	buf := new(bytes.Buffer)
 	wToWin1251 := transform.NewWriter(buf, charmap.Windows1251.NewEncoder())
-	io.Copy(wToWin1251, strings.NewReader(req))
+	io.Copy(wToWin1251, strings.NewReader(address))
 	wToWin1251.Close()
 
-	parts := make([]string, 0)
-	for _, v := range buf.Bytes() {
-		parts = append(parts, fmt.Sprintf("%%%X", v))
-	}
+	address1251 := buf.String()
 
-	reqEncode := strings.Join(parts, "")
-	address := fmt.Sprintf("http://bash.im/index?text=%s", reqEncode)
-
-	res, err := http.Get(address)
+	res, err := http.Get(address1251)
 	if err != nil {
 		return nil, err
 	}
